@@ -40,8 +40,9 @@ async function check() {
 
         data.forEach(wh => {
             log(`- ID: ${wh.webhookID} | URL: ${wh.webhookURL}`);
-            const addrCount = wh.accountAddresses ? wh.accountAddresses.length : 0;
-            log(`  Active: ${wh.webhookType} | Addresses: ${addrCount}`);
+            const accounts = wh.accountAddresses || [];
+            log(`  Active: ${wh.webhookType} | Addresses Count: ${accounts.length}`);
+            log(`  Addresses: ${JSON.stringify(accounts)}`);
         });
 
         const match = data.find(wh => wh.webhookURL === url);

@@ -1,7 +1,16 @@
-import dotenv from 'dotenv';
-import { createClient } from '@supabase/supabase-js';
+const fs = require('fs');
+const path = require('path');
+const dotenv = require('dotenv');
+const { createClient } = require('@supabase/supabase-js');
 
-dotenv.config();
+// Manual dotenv loading because in some environments process.cwd() varies
+const envPath = path.resolve(process.cwd(), '.env');
+if (fs.existsSync(envPath)) {
+    const envConfig = dotenv.parse(fs.readFileSync(envPath));
+    for (const k in envConfig) {
+        process.env[k] = envConfig[k];
+    }
+}
 
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
 const WEBHOOK_URL = process.env.WEBHOOK_URL;
@@ -11,7 +20,6 @@ const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 console.log('--- Environment Check ---');
 console.log('HELIUS_API_KEY:', HELIUS_API_KEY ? 'Present' : 'Missing');
 console.log('WEBHOOK_URL:', WEBHOOK_URL);
-console.log('SUPABASE_URL:', SUPABASE_URL);
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -26,22 +34,27 @@ async function syncWebhooks() {
             return;
         }
 
-        console.log('📦 Addresses in Supabase:', JSON.stringify(addresses, null, 2));
-
-        const activeAddresses = addresses?.filter((a: any) => a.is_active).map((a: any) => a.address) || [];
+        const activeAddresses = addresses?.filter((a) => a.is_active).map((a) => a.address) || [];
         console.log('✅ Active addresses to monitor:', activeAddresses);
 
-        if (!HELIUS_API_KEY || HELIUS_API_KEY.includes('YOUR_')) {
-            console.error('❌ HELIUS_API_KEY not configured correctly');
+        if (!HELIUS_API_KEY) {
+            console.error('❌ HELIUS_API_KEY not found in .env');
             return;
         }
 
+        // Fetch existing webhooks
         const listRes = await fetch(`https://api.helius.xyz/v0/webhooks?api-key=${HELIUS_API_KEY}`);
         const webhooks = await listRes.json();
+
+        if (!Array.isArray(webhooks)) {
+            console.error('❌ Failed to fetch webhooks from Helius:', webhooks);
+            return;
+        }
+
         console.log(`📡 Found ${webhooks.length} existing Helius Webhooks.`);
 
-        // 1. Delete ALL webhooks that don't match our current WEBHOOK_URL to avoid confusion
-        const redundantWebhooks = webhooks.filter((wh: any) => wh.webhookURL !== WEBHOOK_URL);
+        // 1. Delete ALL webhooks that don't match our current WEBHOOK_URL
+        const redundantWebhooks = webhooks.filter((wh) => wh.webhookURL !== WEBHOOK_URL);
         if (redundantWebhooks.length > 0) {
             console.log(`🧹 Cleaning up ${redundantWebhooks.length} redundant webhooks...`);
             for (const wh of redundantWebhooks) {
@@ -54,7 +67,7 @@ async function syncWebhooks() {
             }
         }
 
-        const existingWh = webhooks.find((wh: any) => wh.webhookURL === WEBHOOK_URL);
+        const existingWh = webhooks.find((wh) => wh.webhookURL === WEBHOOK_URL);
 
         if (activeAddresses.length === 0) {
             console.log('⚠️ No addresses to monitor. Skipping update.');
@@ -65,7 +78,7 @@ async function syncWebhooks() {
             webhookURL: WEBHOOK_URL,
             transactionTypes: ["Any"],
             accountAddresses: activeAddresses,
-            webhookType: "enhanced" // Enhanced supports full parsing
+            webhookType: "enhanced"
         };
 
         if (existingWh) {

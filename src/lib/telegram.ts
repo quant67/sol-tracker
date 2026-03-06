@@ -1,3 +1,6 @@
+import { ParsedSwap } from './solana-parser';
+import { resolveTokenInfo, formatTokenAmount } from './token-resolver';
+
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
@@ -24,26 +27,44 @@ export async function sendTelegramAlert(message: string) {
         if (!response.ok) {
             const errorData = await response.json();
             console.error('❌ Telegram API error:', JSON.stringify(errorData));
-        } else {
-            console.log('✅ Telegram alert sent successfully');
         }
     } catch (error) {
         console.error('❌ Failed to send Telegram alert:', error);
     }
 }
 
-export function formatTransactionAlert(tx: any, label: string) {
-    const sigLink = `<a href="https://solscan.io/tx/${tx.signature}">Solscan</a>`;
-    const time = new Date().toLocaleTimeString();
+/**
+ * Format a swap alert message for Telegram
+ */
+export async function formatSwapAlert(swap: ParsedSwap): Promise<string> {
+    const tokenInfo = await resolveTokenInfo(swap.tokenMint);
 
-    return `
-🎯 <b>New Signal: ${label || tx.signer.slice(0, 6)}</b>
+    const icon = swap.type === 'BUY' ? '🟢' : '🔴';
+    const action = swap.type === 'BUY' ? 'BUY' : 'SELL';
+    const costAction = swap.type === 'BUY' ? 'Spent' : 'Received';
+
+    const time = new Date(swap.timestamp * 1000).toLocaleTimeString('en-US', {
+        hour12: false,
+        timeZone: 'Asia/Shanghai'
+    });
+
+    const shortMint = `${swap.tokenMint.slice(0, 4)}...${swap.tokenMint.slice(-4)}`;
+    const tokenAmountStr = formatTokenAmount(swap.tokenAmount);
+    const costStr = swap.costAmount > 0
+        ? `${formatTokenAmount(swap.costAmount)} ${swap.costSymbol}`
+        : 'N/A';
+
+    const solscanLink = `<a href="https://solscan.io/tx/${swap.signature}">Solscan</a>`;
+    const birdeyeLink = `<a href="https://birdeye.so/token/${swap.tokenMint}">Birdeye</a>`;
+    const dexLink = `<a href="https://dexscreener.com/solana/${swap.tokenMint}">DexScreener</a>`;
+
+    return `${icon} <b>${action} — ${swap.walletLabel}</b>
 ━━━━━━━━━━━━━━━━━━
-<b>Type:</b> ${tx.type}
-<b>Amount:</b> ${tx.nativeAmount} SOL
-<b>Source:</b> ${tx.source}
+<b>Token:</b> ${tokenInfo.symbol} (<code>${shortMint}</code>)
+<b>Amount:</b> ${tokenAmountStr} ${tokenInfo.symbol}
+<b>${costAction}:</b> ${costStr}
+<b>DEX:</b> ${swap.dexSource}
 <b>Time:</b> ${time}
 
-🔗 ${sigLink}
-  `.trim();
+🔗 ${solscanLink} | ${birdeyeLink} | ${dexLink}`;
 }

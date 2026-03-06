@@ -1,0 +1,185 @@
+[2026-03-06T12:54:01.311Z] [WEBHOOK] Webhook request received
+[2026-03-06T12:54:01.312Z] [INFO] Webhook body length: 1
+[2026-03-06T12:54:01.900Z] [INFO] Monitoring 1 addresses
+[2026-03-06T12:54:01.902Z] [INFO] Processing TX: 5ccf9Zwt... (Signer: 6XSnN23b)
+[2026-03-06T12:54:03.254Z] [WEBHOOK] Webhook request received
+[2026-03-06T12:54:03.255Z] [INFO] Webhook body length: 1
+[2026-03-06T12:54:03.489Z] [INFO] Monitoring 1 addresses
+[2026-03-06T12:54:03.489Z] [INFO] Processing TX: 5ccf9Zwt... (Signer: 6XSnN23b)
+[2026-03-06T13:12:58.992Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:12:58.993Z] [INFO] Webhook body length: 1
+[2026-03-06T13:12:59.377Z] [INFO] Monitoring 1 addresses: 8ZELLTBuxeTS3so35QxMGugqvKN9nrGCq4DTdPSWcSQX
+[2026-03-06T13:12:59.377Z] [INFO] Processing TX: 4y26P2BA | Signer: 6XSnN23bnDZM363oqofg7tkZSLXvcrqePMTk7CuCbPYH | Involved: 6XSnN23bnDZM363oqofg7tkZSLXvcrqePMTk7CuCbPYH
+[2026-03-06T13:13:00.940Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:13:00.944Z] [INFO] Webhook body length: 1
+[2026-03-06T13:13:01.159Z] [INFO] Monitoring 1 addresses: 8ZELLTBuxeTS3so35QxMGugqvKN9nrGCq4DTdPSWcSQX
+[2026-03-06T13:13:01.160Z] [INFO] Processing TX: 4y26P2BA | Signer: 6XSnN23bnDZM363oqofg7tkZSLXvcrqePMTk7CuCbPYH | Involved: 6XSnN23bnDZM363oqofg7tkZSLXvcrqePMTk7CuCbPYH
+[2026-03-06T13:17:32.838Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:17:32.839Z] [INFO] Webhook body length: 1
+[2026-03-06T13:17:34.422Z] [INFO] Monitoring 1 addresses: 8ZELLTBuxeTS3so35QxMGugqvKN9nrGCq4DTdPSWcSQX
+[2026-03-06T13:17:34.423Z] [INFO] Processing TX: 3XDHiQux | Signer: 6XSnN23bnDZM363oqofg7tkZSLXvcrqePMTk7CuCbPYH | Involved: 6XSnN23bnDZM363oqofg7tkZSLXvcrqePMTk7CuCbPYH, 3FsacgEsK9bxZ3RwSAkcT3mLBCRLYV9kdsSuoviVD3ib, FLHuyZN1XZxQU9ryuBFVGb6FA1LBmcBUcrXCkqacN75F, ComputeBudget111111111111111111111111111111, EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v, TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
+[2026-03-06T13:17:34.758Z] [INFO] NO MATCH in TX 3XDHiQux. Keys: accountData, description, events, fee, feePayer, instructions, lighthouseData, nativeTransfers, signature, slot, source, timestamp, tokenTransfers, transactionError, type
+[2026-03-06T13:17:34.759Z] [INFO] Involved Count: 6 | First 3: 6XSnN23bnDZM363oqofg7tkZSLXvcrqePMTk7CuCbPYH, 3FsacgEsK9bxZ3RwSAkcT3mLBCRLYV9kdsSuoviVD3ib, FLHuyZN1XZxQU9ryuBFVGb6FA1LBmcBUcrXCkqacN75F
+[2026-03-06T13:17:34.777Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:17:34.777Z] [INFO] Webhook body length: 1
+[2026-03-06T13:17:34.993Z] [INFO] Monitoring 1 addresses: 8ZELLTBuxeTS3so35QxMGugqvKN9nrGCq4DTdPSWcSQX
+[2026-03-06T13:17:34.994Z] [INFO] Processing TX: 3XDHiQux | Signer: 6XSnN23bnDZM363oqofg7tkZSLXvcrqePMTk7CuCbPYH | Involved: 6XSnN23bnDZM363oqofg7tkZSLXvcrqePMTk7CuCbPYH, 3FsacgEsK9bxZ3RwSAkcT3mLBCRLYV9kdsSuoviVD3ib, FLHuyZN1XZxQU9ryuBFVGb6FA1LBmcBUcrXCkqacN75F, ComputeBudget111111111111111111111111111111, EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v, TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
+[2026-03-06T13:17:35.210Z] [INFO] NO MATCH in TX 3XDHiQux. Keys: accountData, description, events, fee, feePayer, instructions, lighthouseData, nativeTransfers, signature, slot, source, timestamp, tokenTransfers, transactionError, type
+[2026-03-06T13:17:35.212Z] [INFO] Involved Count: 6 | First 3: 6XSnN23bnDZM363oqofg7tkZSLXvcrqePMTk7CuCbPYH, 3FsacgEsK9bxZ3RwSAkcT3mLBCRLYV9kdsSuoviVD3ib, FLHuyZN1XZxQU9ryuBFVGb6FA1LBmcBUcrXCkqacN75F
+[2026-03-06T13:20:42.337Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:20:42.338Z] [INFO] Webhook body length: 1
+[2026-03-06T13:20:43.311Z] [INFO] Monitoring 1 addresses (lowercased): 8zelltbuxets3so35qxmgugqvkn9nrgcq4dtdpswcsqx
+[2026-03-06T13:20:43.312Z] [INFO] Processing TX: 5bTZRF1S | Signer: 8ZELLTBuxeTS3so35QxMGugqvKN9nrGCq4DTdPSWcSQX
+[2026-03-06T13:20:43.654Z] [SUCCESS] MATCH FOUND! Monitored: 8ZELLTBuxeTS3so35QxMGugqvKN9nrGCq4DTdPSWcSQX
+[2026-03-06T13:20:43.907Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:20:43.908Z] [INFO] Webhook body length: 1
+[2026-03-06T13:20:43.917Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:20:43.918Z] [INFO] Webhook body length: 1
+[2026-03-06T13:20:43.924Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:20:43.924Z] [INFO] Webhook body length: 1
+[2026-03-06T13:20:43.931Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:20:43.932Z] [INFO] Webhook body length: 1
+[2026-03-06T13:20:43.938Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:20:43.938Z] [INFO] Webhook body length: 1
+[2026-03-06T13:20:43.947Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:20:43.947Z] [INFO] Webhook body length: 1
+[2026-03-06T13:20:43.951Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:20:43.951Z] [INFO] Webhook body length: 1
+[2026-03-06T13:20:44.153Z] [INFO] Monitoring 1 addresses (lowercased): 8zelltbuxets3so35qxmgugqvkn9nrgcq4dtdpswcsqx
+[2026-03-06T13:20:44.154Z] [INFO] Processing TX: uLV43L3c | Signer: FL1xVCdwrYMVVFvKsDRmaZsKDuDgCdFHmRpmHvS2QTcc
+[2026-03-06T13:20:44.225Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:20:44.225Z] [INFO] Webhook body length: 1
+[2026-03-06T13:20:44.289Z] [INFO] Monitoring 1 addresses (lowercased): 8zelltbuxets3so35qxmgugqvkn9nrgcq4dtdpswcsqx
+[2026-03-06T13:20:44.290Z] [INFO] Processing TX: 5ejwCs7G | Signer: FL1xVCdwrYMVVFvKsDRmaZsKDuDgCdFHmRpmHvS2QTcc
+[2026-03-06T13:20:44.550Z] [SUCCESS] MATCH FOUND! Monitored: 8ZELLTBuxeTS3so35QxMGugqvKN9nrGCq4DTdPSWcSQX
+[2026-03-06T13:20:44.589Z] [INFO] Monitoring 1 addresses (lowercased): 8zelltbuxets3so35qxmgugqvkn9nrgcq4dtdpswcsqx
+[2026-03-06T13:20:44.590Z] [INFO] Processing TX: ZTUeKFWi | Signer: FL1xVCdwrYMVVFvKsDRmaZsKDuDgCdFHmRpmHvS2QTcc
+[2026-03-06T13:20:44.591Z] [INFO] Monitoring 1 addresses (lowercased): 8zelltbuxets3so35qxmgugqvkn9nrgcq4dtdpswcsqx
+[2026-03-06T13:20:44.592Z] [INFO] Processing TX: RzdcqSuy | Signer: 6pq6rm1az9nPMQp8Qx1xNkHdpAvED5qNPgJyVT8Y2wRg
+[2026-03-06T13:20:44.606Z] [SUCCESS] MATCH FOUND! Monitored: 8ZELLTBuxeTS3so35QxMGugqvKN9nrGCq4DTdPSWcSQX
+[2026-03-06T13:20:44.620Z] [INFO] Monitoring 1 addresses (lowercased): 8zelltbuxets3so35qxmgugqvkn9nrgcq4dtdpswcsqx
+[2026-03-06T13:20:44.621Z] [INFO] Processing TX: 2eRGn2By | Signer: 6pq6rm1az9nPMQp8Qx1xNkHdpAvED5qNPgJyVT8Y2wRg
+[2026-03-06T13:20:44.649Z] [INFO] Monitoring 1 addresses (lowercased): 8zelltbuxets3so35qxmgugqvkn9nrgcq4dtdpswcsqx
+[2026-03-06T13:20:44.650Z] [INFO] Processing TX: 3uNnLKGK | Signer: 6pq6rm1az9nPMQp8Qx1xNkHdpAvED5qNPgJyVT8Y2wRg
+[2026-03-06T13:20:44.805Z] [INFO] Monitoring 1 addresses (lowercased): 8zelltbuxets3so35qxmgugqvkn9nrgcq4dtdpswcsqx
+[2026-03-06T13:20:44.806Z] [INFO] Processing TX: 5bTZRF1S | Signer: 8ZELLTBuxeTS3so35QxMGugqvKN9nrGCq4DTdPSWcSQX
+[2026-03-06T13:20:44.809Z] [SUCCESS] MATCH FOUND! Monitored: 8ZELLTBuxeTS3so35QxMGugqvKN9nrGCq4DTdPSWcSQX
+[2026-03-06T13:20:44.843Z] [SUCCESS] MATCH FOUND! Monitored: 8ZELLTBuxeTS3so35QxMGugqvKN9nrGCq4DTdPSWcSQX
+[2026-03-06T13:20:44.848Z] [SUCCESS] MATCH FOUND! Monitored: 8ZELLTBuxeTS3so35QxMGugqvKN9nrGCq4DTdPSWcSQX
+[2026-03-06T13:20:44.868Z] [SUCCESS] MATCH FOUND! Monitored: 8ZELLTBuxeTS3so35QxMGugqvKN9nrGCq4DTdPSWcSQX
+[2026-03-06T13:20:45.031Z] [SUCCESS] MATCH FOUND! Monitored: 8ZELLTBuxeTS3so35QxMGugqvKN9nrGCq4DTdPSWcSQX
+[2026-03-06T13:20:45.352Z] [INFO] Monitoring 1 addresses (lowercased): 8zelltbuxets3so35qxmgugqvkn9nrgcq4dtdpswcsqx
+[2026-03-06T13:20:45.354Z] [INFO] Processing TX: 3EZ1XbJv | Signer: 6pq6rm1az9nPMQp8Qx1xNkHdpAvED5qNPgJyVT8Y2wRg
+[2026-03-06T13:20:45.575Z] [SUCCESS] MATCH FOUND! Monitored: 8ZELLTBuxeTS3so35QxMGugqvKN9nrGCq4DTdPSWcSQX
+[2026-03-06T13:20:45.894Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:20:45.895Z] [INFO] Webhook body length: 1
+[2026-03-06T13:20:45.901Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:20:45.902Z] [INFO] Webhook body length: 1
+[2026-03-06T13:20:45.908Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:20:45.909Z] [INFO] Webhook body length: 1
+[2026-03-06T13:20:45.911Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:20:45.911Z] [INFO] Webhook body length: 1
+[2026-03-06T13:20:45.927Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:20:45.927Z] [INFO] Webhook body length: 1
+[2026-03-06T13:20:45.929Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:20:45.929Z] [INFO] Webhook body length: 1
+[2026-03-06T13:20:45.932Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:20:45.932Z] [INFO] Webhook body length: 1
+[2026-03-06T13:20:46.127Z] [INFO] Monitoring 1 addresses (lowercased): 8zelltbuxets3so35qxmgugqvkn9nrgcq4dtdpswcsqx
+[2026-03-06T13:20:46.128Z] [INFO] Processing TX: 3uNnLKGK | Signer: 6pq6rm1az9nPMQp8Qx1xNkHdpAvED5qNPgJyVT8Y2wRg
+[2026-03-06T13:20:46.133Z] [INFO] Monitoring 1 addresses (lowercased): 8zelltbuxets3so35qxmgugqvkn9nrgcq4dtdpswcsqx
+[2026-03-06T13:20:46.134Z] [INFO] Processing TX: 5ejwCs7G | Signer: FL1xVCdwrYMVVFvKsDRmaZsKDuDgCdFHmRpmHvS2QTcc
+[2026-03-06T13:20:46.139Z] [INFO] Monitoring 1 addresses (lowercased): 8zelltbuxets3so35qxmgugqvkn9nrgcq4dtdpswcsqx
+[2026-03-06T13:20:46.139Z] [INFO] Processing TX: ZTUeKFWi | Signer: FL1xVCdwrYMVVFvKsDRmaZsKDuDgCdFHmRpmHvS2QTcc
+[2026-03-06T13:20:46.144Z] [INFO] Monitoring 1 addresses (lowercased): 8zelltbuxets3so35qxmgugqvkn9nrgcq4dtdpswcsqx
+[2026-03-06T13:20:46.144Z] [INFO] Processing TX: uLV43L3c | Signer: FL1xVCdwrYMVVFvKsDRmaZsKDuDgCdFHmRpmHvS2QTcc
+[2026-03-06T13:20:46.149Z] [INFO] Monitoring 1 addresses (lowercased): 8zelltbuxets3so35qxmgugqvkn9nrgcq4dtdpswcsqx
+[2026-03-06T13:20:46.149Z] [INFO] Processing TX: RzdcqSuy | Signer: 6pq6rm1az9nPMQp8Qx1xNkHdpAvED5qNPgJyVT8Y2wRg
+[2026-03-06T13:20:46.152Z] [INFO] Monitoring 1 addresses (lowercased): 8zelltbuxets3so35qxmgugqvkn9nrgcq4dtdpswcsqx
+[2026-03-06T13:20:46.153Z] [INFO] Processing TX: 3EZ1XbJv | Signer: 6pq6rm1az9nPMQp8Qx1xNkHdpAvED5qNPgJyVT8Y2wRg
+[2026-03-06T13:20:46.161Z] [INFO] Monitoring 1 addresses (lowercased): 8zelltbuxets3so35qxmgugqvkn9nrgcq4dtdpswcsqx
+[2026-03-06T13:20:46.162Z] [INFO] Processing TX: 2eRGn2By | Signer: 6pq6rm1az9nPMQp8Qx1xNkHdpAvED5qNPgJyVT8Y2wRg
+[2026-03-06T13:20:46.228Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:20:46.229Z] [INFO] Webhook body length: 1
+[2026-03-06T13:20:46.326Z] [SUCCESS] MATCH FOUND! Monitored: 8ZELLTBuxeTS3so35QxMGugqvKN9nrGCq4DTdPSWcSQX
+[2026-03-06T13:20:46.329Z] [SUCCESS] MATCH FOUND! Monitored: 8ZELLTBuxeTS3so35QxMGugqvKN9nrGCq4DTdPSWcSQX
+[2026-03-06T13:20:46.341Z] [SUCCESS] MATCH FOUND! Monitored: 8ZELLTBuxeTS3so35QxMGugqvKN9nrGCq4DTdPSWcSQX
+[2026-03-06T13:20:46.344Z] [SUCCESS] MATCH FOUND! Monitored: 8ZELLTBuxeTS3so35QxMGugqvKN9nrGCq4DTdPSWcSQX
+[2026-03-06T13:20:46.355Z] [SUCCESS] MATCH FOUND! Monitored: 8ZELLTBuxeTS3so35QxMGugqvKN9nrGCq4DTdPSWcSQX
+[2026-03-06T13:20:46.357Z] [SUCCESS] MATCH FOUND! Monitored: 8ZELLTBuxeTS3so35QxMGugqvKN9nrGCq4DTdPSWcSQX
+[2026-03-06T13:20:46.377Z] [SUCCESS] MATCH FOUND! Monitored: 8ZELLTBuxeTS3so35QxMGugqvKN9nrGCq4DTdPSWcSQX
+[2026-03-06T13:20:46.650Z] [INFO] Monitoring 1 addresses (lowercased): 8zelltbuxets3so35qxmgugqvkn9nrgcq4dtdpswcsqx
+[2026-03-06T13:20:46.651Z] [INFO] Processing TX: 5bTZRF1S | Signer: 8ZELLTBuxeTS3so35QxMGugqvKN9nrGCq4DTdPSWcSQX
+[2026-03-06T13:20:46.850Z] [SUCCESS] MATCH FOUND! Monitored: 8ZELLTBuxeTS3so35QxMGugqvKN9nrGCq4DTdPSWcSQX
+[2026-03-06T13:20:47.865Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:20:47.866Z] [INFO] Webhook body length: 1
+[2026-03-06T13:20:47.906Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:20:47.908Z] [INFO] Webhook body length: 1
+[2026-03-06T13:20:47.916Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:20:47.916Z] [INFO] Webhook body length: 1
+[2026-03-06T13:20:47.918Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:20:47.918Z] [INFO] Webhook body length: 1
+[2026-03-06T13:20:47.924Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:20:47.924Z] [INFO] Webhook body length: 1
+[2026-03-06T13:20:47.929Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:20:47.929Z] [INFO] Webhook body length: 1
+[2026-03-06T13:20:47.931Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:20:47.931Z] [INFO] Webhook body length: 1
+[2026-03-06T13:20:48.071Z] [INFO] Monitoring 1 addresses (lowercased): 8zelltbuxets3so35qxmgugqvkn9nrgcq4dtdpswcsqx
+[2026-03-06T13:20:48.072Z] [INFO] Processing TX: 5ejwCs7G | Signer: FL1xVCdwrYMVVFvKsDRmaZsKDuDgCdFHmRpmHvS2QTcc
+[2026-03-06T13:20:48.117Z] [INFO] Monitoring 1 addresses (lowercased): 8zelltbuxets3so35qxmgugqvkn9nrgcq4dtdpswcsqx
+[2026-03-06T13:20:48.118Z] [INFO] Processing TX: uLV43L3c | Signer: FL1xVCdwrYMVVFvKsDRmaZsKDuDgCdFHmRpmHvS2QTcc
+[2026-03-06T13:20:48.121Z] [INFO] Monitoring 1 addresses (lowercased): 8zelltbuxets3so35qxmgugqvkn9nrgcq4dtdpswcsqx
+[2026-03-06T13:20:48.121Z] [INFO] Processing TX: ZTUeKFWi | Signer: FL1xVCdwrYMVVFvKsDRmaZsKDuDgCdFHmRpmHvS2QTcc
+[2026-03-06T13:20:48.123Z] [INFO] Monitoring 1 addresses (lowercased): 8zelltbuxets3so35qxmgugqvkn9nrgcq4dtdpswcsqx
+[2026-03-06T13:20:48.124Z] [INFO] Processing TX: 3EZ1XbJv | Signer: 6pq6rm1az9nPMQp8Qx1xNkHdpAvED5qNPgJyVT8Y2wRg
+[2026-03-06T13:20:48.138Z] [INFO] Monitoring 1 addresses (lowercased): 8zelltbuxets3so35qxmgugqvkn9nrgcq4dtdpswcsqx
+[2026-03-06T13:20:48.139Z] [INFO] Processing TX: 3uNnLKGK | Signer: 6pq6rm1az9nPMQp8Qx1xNkHdpAvED5qNPgJyVT8Y2wRg
+[2026-03-06T13:20:48.147Z] [INFO] Monitoring 1 addresses (lowercased): 8zelltbuxets3so35qxmgugqvkn9nrgcq4dtdpswcsqx
+[2026-03-06T13:20:48.148Z] [INFO] Processing TX: RzdcqSuy | Signer: 6pq6rm1az9nPMQp8Qx1xNkHdpAvED5qNPgJyVT8Y2wRg
+[2026-03-06T13:20:48.196Z] [INFO] Monitoring 1 addresses (lowercased): 8zelltbuxets3so35qxmgugqvkn9nrgcq4dtdpswcsqx
+[2026-03-06T13:20:48.197Z] [INFO] Processing TX: 2eRGn2By | Signer: 6pq6rm1az9nPMQp8Qx1xNkHdpAvED5qNPgJyVT8Y2wRg
+[2026-03-06T13:20:48.274Z] [SUCCESS] MATCH FOUND! Monitored: 8ZELLTBuxeTS3so35QxMGugqvKN9nrGCq4DTdPSWcSQX
+[2026-03-06T13:20:48.317Z] [SUCCESS] MATCH FOUND! Monitored: 8ZELLTBuxeTS3so35QxMGugqvKN9nrGCq4DTdPSWcSQX
+[2026-03-06T13:20:48.320Z] [SUCCESS] MATCH FOUND! Monitored: 8ZELLTBuxeTS3so35QxMGugqvKN9nrGCq4DTdPSWcSQX
+[2026-03-06T13:20:48.322Z] [SUCCESS] MATCH FOUND! Monitored: 8ZELLTBuxeTS3so35QxMGugqvKN9nrGCq4DTdPSWcSQX
+[2026-03-06T13:20:48.341Z] [SUCCESS] MATCH FOUND! Monitored: 8ZELLTBuxeTS3so35QxMGugqvKN9nrGCq4DTdPSWcSQX
+[2026-03-06T13:20:48.372Z] [SUCCESS] MATCH FOUND! Monitored: 8ZELLTBuxeTS3so35QxMGugqvKN9nrGCq4DTdPSWcSQX
+[2026-03-06T13:20:48.388Z] [SUCCESS] MATCH FOUND! Monitored: 8ZELLTBuxeTS3so35QxMGugqvKN9nrGCq4DTdPSWcSQX
+[2026-03-06T13:44:53.002Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:44:53.003Z] [INFO] Webhook body length: 1
+[2026-03-06T13:44:54.226Z] [SUCCESS] 🎯 SWAP DETECTED: BUY | Token: 7vfCXTUX... | Amount: 0.00243595 | SOL: 0.0572 | DEX: JUPITER
+[2026-03-06T13:44:54.896Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:44:54.897Z] [INFO] Webhook body length: 1
+[2026-03-06T13:44:55.131Z] [SUCCESS] 🎯 SWAP DETECTED: BUY | Token: 7vfCXTUX... | Amount: 0.00243595 | SOL: 0.0572 | DEX: JUPITER
+[2026-03-06T13:44:55.759Z] [INFO] Batch done: 1 swaps processed, 0 skipped
+[2026-03-06T13:44:56.303Z] [INFO] Batch done: 1 swaps processed, 0 skipped
+[2026-03-06T13:44:56.896Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:44:56.897Z] [INFO] Webhook body length: 1
+[2026-03-06T13:44:57.107Z] [SUCCESS] 🎯 SWAP DETECTED: BUY | Token: 7vfCXTUX... | Amount: 0.00243595 | SOL: 0.0572 | DEX: JUPITER
+[2026-03-06T13:44:57.764Z] [INFO] Batch done: 1 swaps processed, 0 skipped
+[2026-03-06T13:53:40.734Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:53:40.736Z] [INFO] Webhook body length: 1
+[2026-03-06T13:53:41.791Z] [SUCCESS] 🎯 SWAP DETECTED: BUY | Token: Es9vMFrz... | Amount: 4.995045 | SOL: 0.0574 | DEX: JUPITER
+[2026-03-06T13:53:42.600Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:53:42.601Z] [INFO] Webhook body length: 1
+[2026-03-06T13:53:42.846Z] [INFO] ⏭️ Dedup skip: 42t13PH4
+[2026-03-06T13:53:42.847Z] [INFO] Batch done: 0 swaps, 0 skipped, 1 deduped
+[2026-03-06T13:53:43.001Z] [INFO] Batch done: 1 swaps, 0 skipped, 0 deduped
+[2026-03-06T13:57:26.784Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:57:26.787Z] [INFO] Webhook body length: 1
+[2026-03-06T13:57:28.664Z] [SUCCESS] 🎯 SWAP DETECTED: BUY | Token: cbbtcf3a... | Amount: 9.9e-7 | SOL: 0.0116 | DEX: JUPITER
+[2026-03-06T13:57:28.769Z] [WEBHOOK] Webhook request received
+[2026-03-06T13:57:28.771Z] [INFO] Webhook body length: 1
+[2026-03-06T13:57:29.161Z] [INFO] ⏭️ Dedup skip: 4QEiyLwT
+[2026-03-06T13:57:29.161Z] [INFO] Batch done: 0 swaps, 0 skipped, 1 deduped
+[2026-03-06T13:57:31.016Z] [INFO] Batch done: 1 swaps, 0 skipped, 0 deduped
+[2026-03-06T14:10:42.150Z] [WEBHOOK] Webhook request received
+[2026-03-06T14:10:42.151Z] [INFO] Webhook body length: 1
+[2026-03-06T14:10:43.260Z] [SUCCESS] 🎯 SWAP DETECTED: BUY | Token: 32CdQdBU... | Amount: 862.338335 | Cost: 1.998 USDC | DEX: JUPITER
+[2026-03-06T14:10:43.527Z] [SUCCESS] ✅ DB insert success: 3wT1HGQT
+[2026-03-06T14:10:44.039Z] [WEBHOOK] Webhook request received
+[2026-03-06T14:10:44.040Z] [INFO] Webhook body length: 1
+[2026-03-06T14:10:44.300Z] [INFO] ⏭️ Dedup skip: 3wT1HGQT
+[2026-03-06T14:10:44.300Z] [INFO] Batch done: 0 swaps, 0 skipped, 1 deduped
+[2026-03-06T14:10:44.807Z] [INFO] Batch done: 1 swaps, 0 skipped, 0 deduped

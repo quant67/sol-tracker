@@ -61,30 +61,30 @@ export function AddressList() {
     };
 
     return (
-        <Card className="bg-[#0a0a0a] border-zinc-800/50 shadow-2xl rounded-2xl overflow-hidden">
-            <CardHeader className="flex flex-row items-center justify-between border-b border-zinc-800/50 px-6 py-4">
+        <Card className="bg-card border-border rounded-2xl overflow-hidden transition-colors shadow-none">
+            <CardHeader className="flex flex-row items-center justify-between border-b border-border px-6 py-4 transition-colors">
                 <div className="flex items-center gap-2">
                     <Activity className="w-5 h-5 text-indigo-500" />
-                    <CardTitle className="text-lg font-semibold text-zinc-100">Monitored Addresses</CardTitle>
+                    <CardTitle className="text-lg font-semibold text-foreground">Monitored Addresses</CardTitle>
                 </div>
                 <Badge variant="outline" className="bg-indigo-500/10 text-indigo-400 border-indigo-500/20 px-2 py-0.5 font-mono">
                     {addresses.length}/50
                 </Badge>
             </CardHeader>
             <CardContent className="p-0">
-                <form onSubmit={handleAdd} className="p-4 border-b border-zinc-800/50 bg-zinc-900/20 space-y-3">
+                <form onSubmit={handleAdd} className="p-6 border-b border-border space-y-4 transition-colors">
                     <Input
                         placeholder="Solana Address (e.g. 675f...)"
                         value={newAddress}
                         onChange={(e) => setNewAddress(e.target.value)}
-                        className="bg-black/50 border-zinc-800 h-9 text-sm"
+                        className="bg-muted/30 border-border/50 h-9 text-sm text-foreground placeholder:text-muted-foreground transition-all shadow-none"
                     />
                     <div className="flex gap-2">
                         <Input
                             placeholder="Label (Personal Wallet)"
                             value={newLabel}
                             onChange={(e) => setNewLabel(e.target.value)}
-                            className="bg-black/50 border-zinc-800 h-9 text-sm"
+                            className="bg-muted/30 border-border/50 h-9 text-sm text-foreground placeholder:text-muted-foreground transition-all shadow-none"
                         />
                         <Button type="submit" disabled={isAdding} className="h-9 bg-indigo-600 hover:bg-indigo-700 whitespace-nowrap">
                             {isAdding ? <Loader2 className="w-4 h-4 animate-spin" /> : "Track"}
@@ -92,21 +92,21 @@ export function AddressList() {
                     </div>
                 </form>
 
-                <div className="divide-y divide-zinc-800/50 max-h-[400px] overflow-y-auto">
+                <div className="divide-y divide-border max-h-[400px] overflow-y-auto">
                     {loading ? (
                         <div className="p-8 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-zinc-600" /></div>
                     ) : addresses.length === 0 ? (
-                        <div className="p-8 text-center text-zinc-500 text-sm italic">No addresses tracked yet</div>
+                        <div className="p-8 text-center text-muted-foreground text-sm italic">No addresses tracked yet</div>
                     ) : (
                         addresses.map((item) => (
-                            <div key={item.id} className="group hover:bg-zinc-900/40 p-4 transition-colors">
+                            <div key={item.id} className="group hover:bg-muted/40 p-4 transition-colors">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-4">
-                                        <div className={`w-2 h-2 rounded-full ${item.is_active ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]' : 'bg-zinc-600'}`}></div>
+                                        <div className={`w-2 h-2 rounded-full ${item.is_active ? 'bg-emerald-500' : 'bg-zinc-600'}`}></div>
                                         <div>
                                             <div className="flex items-center gap-2">
-                                                <span className="font-medium text-zinc-200">{item.label || "Unnamed"}</span>
-                                                <Badge variant="secondary" className="bg-zinc-800 hover:bg-zinc-700 text-[10px] text-zinc-400 font-mono py-0 px-1.5 h-auto">
+                                                <span className="font-medium text-foreground">{item.label || "Unnamed"}</span>
+                                                <Badge variant="secondary" className="bg-muted hover:bg-muted/80 text-[10px] text-muted-foreground font-mono py-0 px-1.5 h-auto transition-colors">
                                                     {item.address.slice(0, 4)}...{item.address.slice(-4)}
                                                 </Badge>
                                             </div>
