@@ -1,5 +1,5 @@
 import { ParsedSwap } from './solana-parser';
-import { resolveTokenInfo, formatTokenAmount } from './token-resolver';
+import { resolveTokenInfo, formatTokenAmount, formatMarketCap } from './token-resolver';
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
@@ -35,6 +35,8 @@ export async function sendTelegramAlert(message: string) {
 
 /**
  * Format a swap alert message for Telegram
+ * - Full CA in <code> block for easy copy
+ * - Market cap display
  */
 export async function formatSwapAlert(swap: ParsedSwap): Promise<string> {
     const tokenInfo = await resolveTokenInfo(swap.tokenMint);
@@ -48,11 +50,11 @@ export async function formatSwapAlert(swap: ParsedSwap): Promise<string> {
         timeZone: 'Asia/Shanghai'
     });
 
-    const shortMint = `${swap.tokenMint.slice(0, 4)}...${swap.tokenMint.slice(-4)}`;
     const tokenAmountStr = formatTokenAmount(swap.tokenAmount);
     const costStr = swap.costAmount > 0
         ? `${formatTokenAmount(swap.costAmount)} ${swap.costSymbol}`
         : 'N/A';
+    const mcStr = formatMarketCap(tokenInfo.marketCap);
 
     const solscanLink = `<a href="https://solscan.io/tx/${swap.signature}">Solscan</a>`;
     const birdeyeLink = `<a href="https://birdeye.so/token/${swap.tokenMint}">Birdeye</a>`;
@@ -60,11 +62,15 @@ export async function formatSwapAlert(swap: ParsedSwap): Promise<string> {
 
     return `${icon} <b>${action} — ${swap.walletLabel}</b>
 ━━━━━━━━━━━━━━━━━━
-<b>Token:</b> ${tokenInfo.symbol} (<code>${shortMint}</code>)
+<b>Token:</b> ${tokenInfo.symbol}
+<b>MCap:</b> ${mcStr}
 <b>Amount:</b> ${tokenAmountStr} ${tokenInfo.symbol}
 <b>${costAction}:</b> ${costStr}
 <b>DEX:</b> ${swap.dexSource}
 <b>Time:</b> ${time}
+
+<b>CA:</b>
+<code>${swap.tokenMint}</code>
 
 🔗 ${solscanLink} | ${birdeyeLink} | ${dexLink}`;
 }
