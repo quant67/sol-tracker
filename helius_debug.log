@@ -1,0 +1,7 @@
+--- HELIUS DEBUG START ---
+2026-03-06T10:52:20.086Z - API Key: Found
+2026-03-06T10:52:20.089Z - Webhook URL: https://elvin-summerly-undeliberatively.ngrok-free.dev/api/webhook/helius
+2026-03-06T10:52:20.089Z - Fetching webhooks from Helius...
+2026-03-06T10:52:21.280Z - Found 1 webhooks.
+2026-03-06T10:52:21.280Z - - ID: 2fec8120-188f-4009-b960-d6395934473b | URL: https://elvin-summerly-undeliberatively.ngrok-free.dev/api/webhook/helius
+2026-03-06T10:52:21.280Z - 💥 Crash: Cannot read properties of undefined (reading 'length')
