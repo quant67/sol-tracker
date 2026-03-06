@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { syncHeliusWebhook } from '@/lib/helius-sync';
 
 // GET: List all people with their addresses
 export async function GET() {
@@ -70,5 +71,9 @@ export async function DELETE(req: NextRequest) {
         .eq('id', id);
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    // Sync to Helius (addresses were cascade-deleted)
+    syncHeliusWebhook().catch(console.error);
+
     return NextResponse.json({ success: true });
 }

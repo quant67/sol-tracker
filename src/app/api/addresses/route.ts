@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { syncHeliusWebhook } from '@/lib/helius-sync';
 
 export async function GET() {
     const { data, error } = await supabase
@@ -23,6 +24,10 @@ export async function POST(req: NextRequest) {
         .select();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    // Sync to Helius (non-blocking)
+    syncHeliusWebhook().catch(console.error);
+
     return NextResponse.json(data[0]);
 }
 
@@ -38,6 +43,10 @@ export async function DELETE(req: NextRequest) {
         .eq('id', id);
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    // Sync to Helius (non-blocking)
+    syncHeliusWebhook().catch(console.error);
+
     return NextResponse.json({ success: true });
 }
 
@@ -62,5 +71,11 @@ export async function PATCH(req: NextRequest) {
         .select();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    // Sync to Helius if active status changed (non-blocking)
+    if (is_active !== undefined) {
+        syncHeliusWebhook().catch(console.error);
+    }
+
     return NextResponse.json(data?.[0] || { success: true });
 }

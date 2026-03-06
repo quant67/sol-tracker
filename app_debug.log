@@ -183,3 +183,87 @@
 [2026-03-06T14:10:44.300Z] [INFO] ⏭️ Dedup skip: 3wT1HGQT
 [2026-03-06T14:10:44.300Z] [INFO] Batch done: 0 swaps, 0 skipped, 1 deduped
 [2026-03-06T14:10:44.807Z] [INFO] Batch done: 1 swaps, 0 skipped, 0 deduped
+[2026-03-06T19:25:57.928Z] [WEBHOOK] Webhook request received
+[2026-03-06T19:25:57.932Z] [INFO] Webhook body length: 1
+[2026-03-06T19:25:58.579Z] [SUCCESS] 🎯 SWAP DETECTED: SELL | Person: Default | Token: 32CdQdBU... | Amount: 1000 | Cost: 0.0235 SOL | DEX: JUPITER
+[2026-03-06T19:25:58.896Z] [SUCCESS] ✅ DB insert success: 3VDxoYPD
+[2026-03-06T19:25:59.844Z] [WEBHOOK] Webhook request received
+[2026-03-06T19:25:59.844Z] [INFO] Webhook body length: 1
+[2026-03-06T19:26:00.226Z] [INFO] ⏭️ Dedup skip: 3VDxoYPD
+[2026-03-06T19:26:00.227Z] [INFO] Batch done: 0 swaps, 0 skipped, 1 deduped
+[2026-03-06T19:26:00.399Z] [INFO] Batch done: 1 swaps, 0 skipped, 0 deduped
+[2026-03-06T19:48:13.078Z] [WEBHOOK] Webhook request received
+[2026-03-06T19:48:13.080Z] [INFO] Webhook body length: 1
+[2026-03-06T19:48:13.837Z] [SUCCESS] 🎯 SWAP DETECTED: BUY | Person: 67 | Token: 32CdQdBU... | Amount: 991.738654 | Cost: 0.0233 SOL | DEX: JUPITER
+[2026-03-06T19:48:14.092Z] [SUCCESS] ✅ DB insert success: 2w6UVEix
+[2026-03-06T19:48:15.032Z] [INFO] Batch done: 1 swaps, 0 skipped, 0 deduped
+[2026-03-06T19:48:15.053Z] [WEBHOOK] Webhook request received
+[2026-03-06T19:48:15.054Z] [INFO] Webhook body length: 1
+[2026-03-06T19:48:15.326Z] [INFO] ⏭️ Dedup skip: 2w6UVEix
+[2026-03-06T19:48:15.326Z] [INFO] Batch done: 0 swaps, 0 skipped, 1 deduped
+[2026-03-06T19:48:15.552Z] [WEBHOOK] Webhook request received
+[2026-03-06T19:48:15.581Z] [INFO] Webhook body length: 1
+[2026-03-06T19:48:15.595Z] [WEBHOOK] Webhook request received
+[2026-03-06T19:48:15.596Z] [INFO] Webhook body length: 1
+[2026-03-06T19:48:15.613Z] [WEBHOOK] Webhook request received
+[2026-03-06T19:48:15.614Z] [INFO] Webhook body length: 1
+[2026-03-06T19:48:15.626Z] [WEBHOOK] Webhook request received
+[2026-03-06T19:48:15.627Z] [INFO] Webhook body length: 1
+[2026-03-06T19:48:15.633Z] [WEBHOOK] Webhook request received
+[2026-03-06T19:48:15.634Z] [INFO] Webhook body length: 1
+[2026-03-06T19:48:15.641Z] [WEBHOOK] Webhook request received
+[2026-03-06T19:48:15.642Z] [INFO] Webhook body length: 1
+[2026-03-06T19:48:15.845Z] [INFO] Skipping non-swap TX: 4KNkqSJa (type: TRANSFER)
+[2026-03-06T19:48:15.845Z] [INFO] Batch done: 0 swaps, 1 skipped, 0 deduped
+[2026-03-06T19:48:16.016Z] [INFO] Skipping non-swap TX: 3CsxKt59 (type: TRANSFER)
+[2026-03-06T19:48:16.017Z] [INFO] Batch done: 0 swaps, 1 skipped, 0 deduped
+[2026-03-06T19:48:16.040Z] [INFO] Skipping non-swap TX: 55UC745R (type: TRANSFER)
+[2026-03-06T19:48:16.041Z] [INFO] Batch done: 0 swaps, 1 skipped, 0 deduped
+[2026-03-06T19:48:16.104Z] [INFO] Skipping non-swap TX: 3pWTi28j (type: TRANSFER)
+[2026-03-06T19:48:16.105Z] [INFO] Batch done: 0 swaps, 1 skipped, 0 deduped
+[2026-03-06T19:48:16.253Z] [INFO] Skipping non-swap TX: 3RUEbi3A (type: TRANSFER)
+[2026-03-06T19:48:16.254Z] [INFO] Batch done: 0 swaps, 1 skipped, 0 deduped
+[2026-03-06T19:48:16.257Z] [INFO] Skipping non-swap TX: 5DHRS8sX (type: TRANSFER)
+[2026-03-06T19:48:16.257Z] [INFO] Batch done: 0 swaps, 1 skipped, 0 deduped
+[2026-03-06T19:48:16.504Z] [WEBHOOK] Webhook request received
+[2026-03-06T19:48:16.505Z] [INFO] Webhook body length: 1
+[2026-03-06T19:48:16.725Z] [INFO] Skipping non-swap TX: 2DGtT6tC (type: TRANSFER)
+[2026-03-06T19:48:16.725Z] [INFO] Batch done: 0 swaps, 1 skipped, 0 deduped
+[2026-03-06T19:48:17.302Z] [WEBHOOK] Webhook request received
+[2026-03-06T19:48:17.303Z] [INFO] Webhook body length: 1
+[2026-03-06T19:48:17.339Z] [WEBHOOK] Webhook request received
+[2026-03-06T19:48:17.340Z] [INFO] Webhook body length: 1
+[2026-03-06T19:48:17.345Z] [WEBHOOK] Webhook request received
+[2026-03-06T19:48:17.345Z] [INFO] Webhook body length: 1
+[2026-03-06T19:48:17.350Z] [WEBHOOK] Webhook request received
+[2026-03-06T19:48:17.351Z] [INFO] Webhook body length: 1
+[2026-03-06T19:48:17.370Z] [WEBHOOK] Webhook request received
+[2026-03-06T19:48:17.370Z] [INFO] Webhook body length: 1
+[2026-03-06T19:48:17.525Z] [INFO] Skipping non-swap TX: 5WJm1rAD (type: TRANSFER)
+[2026-03-06T19:48:17.525Z] [INFO] Batch done: 0 swaps, 1 skipped, 0 deduped
+[2026-03-06T19:48:17.550Z] [INFO] Skipping non-swap TX: 3CALSn1c (type: TRANSFER)
+[2026-03-06T19:48:17.551Z] [INFO] Batch done: 0 swaps, 1 skipped, 0 deduped
+[2026-03-06T19:48:17.555Z] [INFO] Skipping non-swap TX: Kw6KSRpJ (type: TRANSFER)
+[2026-03-06T19:48:17.555Z] [INFO] Batch done: 0 swaps, 1 skipped, 0 deduped
+[2026-03-06T19:48:17.557Z] [INFO] Skipping non-swap TX: 3Qsi8vCE (type: TRANSFER)
+[2026-03-06T19:48:17.557Z] [INFO] Batch done: 0 swaps, 1 skipped, 0 deduped
+[2026-03-06T19:48:17.564Z] [WEBHOOK] Webhook request received
+[2026-03-06T19:48:17.565Z] [INFO] Webhook body length: 1
+[2026-03-06T19:48:17.567Z] [INFO] Skipping non-swap TX: 5oLP65En (type: TRANSFER)
+[2026-03-06T19:48:17.567Z] [INFO] Batch done: 0 swaps, 1 skipped, 0 deduped
+[2026-03-06T19:48:17.569Z] [WEBHOOK] Webhook request received
+[2026-03-06T19:48:17.569Z] [INFO] Webhook body length: 1
+[2026-03-06T19:48:17.752Z] [INFO] ⏭️ Dedup skip: 3RUEbi3A
+[2026-03-06T19:48:17.753Z] [INFO] Batch done: 0 swaps, 0 skipped, 1 deduped
+[2026-03-06T19:48:17.767Z] [INFO] ⏭️ Dedup skip: 5DHRS8sX
+[2026-03-06T19:48:17.768Z] [INFO] Batch done: 0 swaps, 0 skipped, 1 deduped
+[2026-03-06T20:00:16.418Z] [SUCCESS] ✅ Helius webhook synced: 3 addresses
+[2026-03-06T20:00:59.257Z] [WEBHOOK] Webhook request received
+[2026-03-06T20:00:59.259Z] [INFO] Webhook body length: 1
+[2026-03-06T20:00:59.650Z] [SUCCESS] 🎯 SWAP DETECTED: BUY | Person: 67 | Token: BorBvxBN... | Amount: 5996.580338 | Cost: 0.0232 SOL | DEX: JUPITER
+[2026-03-06T20:00:59.922Z] [SUCCESS] ✅ DB insert success: 5XntGoKu
+[2026-03-06T20:01:01.258Z] [WEBHOOK] Webhook request received
+[2026-03-06T20:01:01.259Z] [INFO] Webhook body length: 1
+[2026-03-06T20:01:01.488Z] [INFO] ⏭️ Dedup skip: 5XntGoKu
+[2026-03-06T20:01:01.489Z] [INFO] Batch done: 0 swaps, 0 skipped, 1 deduped
+[2026-03-06T20:01:01.514Z] [INFO] Batch done: 1 swaps, 0 skipped, 0 deduped
