@@ -27,7 +27,7 @@ async function runDiag() {
             output += 'ERROR: No Helius API Key\n';
         }
     } catch (err) {
-        output += `ERROR: ${err.message}\n`;
+        output += `ERROR: ${err instanceof Error ? err.message : String(err)}\n`;
     }
 
     fs.writeFileSync('diag_results.log', output);
