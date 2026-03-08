@@ -1,12 +1,17 @@
 "use client";
 
 import React from "react";
-import { Target, UserPlus } from "lucide-react";
+import { Target, LogOut } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { AddressSidebar } from "@/components/dashboard/address-sidebar";
 import { Button } from "@/components/ui/button";
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
+    const handleLogout = async () => {
+        await fetch("/api/auth/logout", { method: "POST" });
+        window.location.href = "/login";
+    };
+
     return (
         <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans">
             {/* Left Sidebar — Address Management */}
@@ -31,8 +36,17 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-600/[0.02] dark:bg-indigo-600/5 blur-[120px] rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
 
                 {/* Top Bar */}
-                <header className="h-14 border-b border-border flex items-center justify-end px-6 bg-card/50 backdrop-blur-xl sticky top-0 z-10 transition-colors shrink-0">
+                <header className="h-14 border-b border-border flex items-center justify-end gap-2 px-6 bg-card/50 backdrop-blur-xl sticky top-0 z-10 transition-colors shrink-0">
                     <ThemeToggle />
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleLogout}
+                        className="text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10"
+                        title="Sign out"
+                    >
+                        <LogOut className="w-4 h-4" />
+                    </Button>
                 </header>
 
                 {/* Scrollable Content */}
