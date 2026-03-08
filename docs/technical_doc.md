@@ -19,26 +19,33 @@ sol-tracker/
 │   ├── app/
 │   │   ├── api/
 │   │   │   ├── addresses/route.ts    # 地址 CRUD API
+│   │   │   ├── auth/login/route.ts   # 🔒 登录 API
+│   │   │   ├── auth/logout/route.ts  # 🔒 登出 API
+│   │   │   ├── logs/route.ts         # 交易日志 API
 │   │   │   ├── people/route.ts       # 人员 CRUD API
+│   │   │   ├── stats/route.ts        # 统计数据 API
 │   │   │   └── webhook/helius/route.ts  # ⭐ Helius Webhook 接收端
+│   │   ├── login/page.tsx            # 🔒 登录页面
 │   │   ├── page.tsx                  # 首页入口
 │   │   ├── layout.tsx                # 全局布局
 │   │   └── globals.css
 │   ├── components/
 │   │   ├── dashboard/
-│   │   │   ├── dashboard-shell.tsx    # 主布局（左侧栏 + 内容区）
+│   │   │   ├── dashboard-shell.tsx    # 主布局（左侧栏 + 内容区 + 退出按钮）
 │   │   │   ├── address-sidebar.tsx    # 左侧地址管理面板
-│   │   │   ├── dashboard-stats.tsx    # 统计卡片（实时更新）
-│   │   │   └── recent-activity.tsx    # 交易记录表格（实时更新）
+│   │   │   ├── dashboard-stats.tsx    # 统计卡片（API 轮询）
+│   │   │   └── recent-activity.tsx    # 交易记录表格（API 轮询）
 │   │   └── ui/                       # shadcn/ui 基础组件
-│   └── lib/
-│       ├── supabase.ts               # Supabase 客户端初始化
-│       ├── helius-sync.ts            # Helius Webhook 同步逻辑
-│       ├── solana-parser.ts          # ⭐ 交易解析核心
-│       ├── telegram.ts              # Telegram 推送 + 消息格式化
-│       ├── token-resolver.ts         # Token 信息解析（名称/市值）
-│       ├── logger.ts                 # 文件日志
-│       └── utils.ts                  # 工具函数
+│   ├── lib/
+│   │   ├── auth.ts                   # 🔒 Token 签发/验证
+│   │   ├── supabase.ts               # Supabase 客户端（仅服务端）
+│   │   ├── helius-sync.ts            # Helius Webhook 同步逻辑
+│   │   ├── solana-parser.ts          # ⭐ 交易解析核心
+│   │   ├── telegram.ts              # Telegram 推送 + 消息格式化
+│   │   ├── token-resolver.ts         # Token 信息解析（名称/市值）
+│   │   ├── logger.ts                 # 文件日志
+│   │   └── utils.ts                  # 工具函数
+│   └── middleware.ts                 # 🔒 路由鉴权拦截
 ├── scripts/
 │   ├── manage-webhook.js             # 手动管理 Helius Webhook
 │   ├── sync-helius.js                # 手动同步地址到 Helius
@@ -46,11 +53,11 @@ sol-tracker/
 ├── supabase/
 │   ├── schema.sql                    # 完整数据库 Schema
 │   └── migration-people.sql          # People 表迁移脚本
-├── deploy/                           # 🆕 VPS 部署配置
+├── deploy/                           # VPS 部署配置
 │   ├── nginx.conf
 │   ├── setup-server.sh
 │   └── deploy.sh
-└── ecosystem.config.js               # 🆕 PM2 配置
+└── ecosystem.config.js               # PM2 配置
 ```
 
 ---
@@ -82,7 +89,6 @@ graph TB
         DB_ADDR["addresses 表"]
         DB_LOGS["logs 表"]
         DB_PPL["people 表"]
-        RT["Realtime 订阅"]
     end
 
     subgraph External["外部服务"]
@@ -91,6 +97,7 @@ graph TB
     end
 
     subgraph Client["浏览器 Dashboard"]
+        AUTH["🔒 Login 鉴权"]
         DASH["Dashboard UI"]
     end
 
@@ -104,10 +111,8 @@ graph TB
     TG_LIB --> RESOLVER
     RESOLVER -->|"查 Token 名称/市值"| DEX
     TG_LIB -->|"发送消息"| TG
-    DB_LOGS -->|"Realtime"| RT
-    RT -->|"WebSocket"| DASH
-    DASH -->|"REST API"| DB_ADDR
-    DASH -->|"REST API"| DB_PPL
+    AUTH -->|"Cookie 验证"| DASH
+    DASH -->|"API 轮询 (5s)"| NEXT
 ```
 
 ### 3.2 Helius Webhook 工作原理
@@ -157,12 +162,18 @@ sequenceDiagram
 3. 格式化为 HTML 消息（包含 BUY/SELL 图标、Token 名称、金额、市值、Solscan/Birdeye/DexScreener 链接）
 4. 通过 Telegram Bot API `sendMessage` 发送到指定 `CHAT_ID`
 
-### 3.4 Dashboard 实时更新
+### 3.4 Dashboard 数据更新
 
-前端组件通过 **Supabase Realtime** 实现实时刷新，无需轮询：
+前端组件通过**服务端 API 路由 + 5 秒轮询**获取数据（Supabase 仅在服务端使用，密钥不暴露）：
 
-- [dashboard-stats.tsx](file:///Users/sixseven/dev/ai-coding/sol-tracker/src/components/dashboard/dashboard-stats.tsx) — 订阅 `addresses` 和 `logs` 表变化，实时更新统计数字
-- [recent-activity.tsx](file:///Users/sixseven/dev/ai-coding/sol-tracker/src/components/dashboard/recent-activity.tsx) — 订阅 `logs` 表 INSERT 事件，新交易自动出现在表格顶部
+- [dashboard-stats.tsx](file:///Users/sixseven/dev/ai-coding/sol-tracker/src/components/dashboard/dashboard-stats.tsx) — 每 5 秒调用 `GET /api/stats`
+- [recent-activity.tsx](file:///Users/sixseven/dev/ai-coding/sol-tracker/src/components/dashboard/recent-activity.tsx) — 每 5 秒调用 `GET /api/logs`
+
+### 3.5 登录认证
+
+- **Middleware** 拦截所有请求，未登录 → 重定向 `/login`
+- **白名单**：`/login`、`/api/auth/*`、`/api/webhook/*` 不需要登录
+- **Cookie**：HMAC-SHA256 签名，HttpOnly，7 天有效期
 
 ---
 
@@ -220,8 +231,8 @@ erDiagram
 
 | 问题 | 现状 | 建议 |
 |---|---|---|
-| **无鉴权** | API 路由完全开放，任何人可增删地址 | 添加简单 API Key 认证或 Supabase Auth |
-| **Anon Key 暴露** | `NEXT_PUBLIC_SUPABASE_ANON_KEY` 在前端可见 | 加 RLS 策略限制，或后端代理所有 DB 操作 |
+| ~~**无鉴权**~~ | ✅ 已解决 | Middleware + Cookie 鉴权，密码登录 |
+| ~~**Anon Key 暴露**~~ | ✅ 已解决 | 去掉 `NEXT_PUBLIC_` 前缀，前端通过 API 路由获取数据 |
 | **Token 缓存无 TTL** | `tokenCache` 是内存 Map，永不过期 | 添加过期机制（如 10 分钟后删除），避免市值数据陈旧 |
 | **日志写文件** | `logger.ts` 用 `appendFileSync` 同步写文件 | standalone 模式下 `process.cwd()` 可能不对；应改用 PM2 日志 或结构化日志 |
 
@@ -262,7 +273,7 @@ erDiagram
 
 | 需求 | 说明 | 难度 |
 |---|---|---|
-| **用户认证** | 给 Dashboard 加登录，防止未授权访问 | ⭐⭐ |
+| ~~**用户认证**~~ | ✅ 已实现：密码登录 + Middleware 鉴权 | — |
 | **HTTPS** | 绑定域名 + Let's Encrypt 免费证书 | ⭐ |
 | **CI/CD** | GitHub Actions：push → 自动部署到 VPS | ⭐⭐ |
 | **监控告警** | PM2 + UptimeRobot 监控应用存活，宕机时通知 | ⭐ |

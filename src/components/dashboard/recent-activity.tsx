@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { ArrowUpRight, ArrowDownLeft, Zap, ExternalLink, Loader2 } from "lucide-react";
 import {
     Table,
@@ -10,48 +10,33 @@ import {
     TableHeader,
     TableRow
 } from "@/components/ui/table";
-import { supabase } from "@/lib/supabase";
+
+const POLL_INTERVAL = 5000; // 5 seconds
 
 export function RecentActivity() {
     const [logs, setLogs] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        const fetchLogs = async () => {
-            const { data, error } = await supabase
-                .from("logs")
-                .select("*")
-                .order("timestamp", { ascending: false })
-                .limit(50);
-
-            if (!error && data) setLogs(data);
+    const fetchLogs = useCallback(async () => {
+        try {
+            const res = await fetch('/api/logs');
+            if (res.ok) {
+                const data = await res.json();
+                if (Array.isArray(data)) setLogs(data);
+            }
+        } catch (error) {
+            console.error("Error fetching logs:", error);
+        } finally {
             setLoading(false);
-        };
+        }
+    }, []);
 
+    useEffect(() => {
         fetchLogs();
 
-        // Set up realtime subscription for both INSERT and UPDATE
-        const channel = supabase
-            .channel('logs-realtime')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'logs' }, (payload) => {
-                setLogs(prev => {
-                    // Dedup by signature
-                    const exists = prev.some(log => log.signature === payload.new.signature);
-                    if (exists) return prev;
-                    return [payload.new, ...prev].slice(0, 50);
-                });
-            })
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'logs' }, (payload) => {
-                setLogs(prev => prev.map(log =>
-                    log.signature === payload.new.signature ? payload.new : log
-                ));
-            })
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, []);
+        const interval = setInterval(fetchLogs, POLL_INTERVAL);
+        return () => clearInterval(interval);
+    }, [fetchLogs]);
 
     const getTypeInfo = (type: string) => {
         if (type?.includes('BUY')) return { icon: <ArrowUpRight className="w-4 h-4" />, color: 'text-emerald-400', bg: 'bg-emerald-500/10', label: '🟢 BUY' };

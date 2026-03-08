@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Target, Zap } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+
+const POLL_INTERVAL = 5000; // 5 seconds
 
 function StatCard({ label, value, increase, icon }: { label: string, value: string, increase: string, icon: React.ReactNode }) {
     return (
@@ -33,66 +34,26 @@ export function DashboardStats() {
         increaseToday: 0
     });
 
-    const fetchStats = async () => {
+    const fetchStats = useCallback(async () => {
         try {
-            // Today at 00:00:00
-            const startOfDay = new Date();
-            startOfDay.setHours(0, 0, 0, 0);
-
-            // 1. Fetch total monitored
-            const { count: totalCount } = await supabase
-                .from("addresses")
-                .select("*", { count: 'exact', head: true });
-
-            // 2. Fetch new addresses today
-            const { count: newTodayCount } = await supabase
-                .from("addresses")
-                .select("*", { count: 'exact', head: true })
-                .gte("created_at", startOfDay.toISOString());
-
-            // 3. Fetch today's signals
-            const { count: signalsCount } = await supabase
-                .from("logs")
-                .select("*", { count: 'exact', head: true })
-                .gte("timestamp", startOfDay.toISOString());
-
-            setStats({
-                totalMonitored: totalCount || 0,
-                todaySignals: signalsCount || 0,
-                increaseToday: newTodayCount || 0
-            });
+            const res = await fetch('/api/stats');
+            if (res.ok) {
+                const data = await res.json();
+                setStats(data);
+            }
         } catch (error) {
             console.error("Error fetching stats:", error);
         }
-    };
+    }, []);
 
     useEffect(() => {
         setMounted(true);
         fetchStats();
 
-        // Subscribe to changes in addresses
-        const addressChannel = supabase
-            .channel('stats-addresses')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'addresses' }, () => {
-                fetchStats();
-            })
-            .subscribe();
+        const interval = setInterval(fetchStats, POLL_INTERVAL);
+        return () => clearInterval(interval);
+    }, [fetchStats]);
 
-        // Subscribe to changes in logs
-        const logsChannel = supabase
-            .channel('stats-logs')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'logs' }, () => {
-                fetchStats();
-            })
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(addressChannel);
-            supabase.removeChannel(logsChannel);
-        };
-    }, []);
-
-    // Prevent hydration mismatch by returning a static shell until mounted
     if (!mounted) {
         return (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
