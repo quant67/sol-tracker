@@ -2,6 +2,7 @@
 # ============================================
 # sol-tracker 部署/更新脚本
 # 在 VPS 上运行: bash deploy/deploy.sh
+# 也可由 GitHub Actions CI/CD 自动触发
 # ============================================
 set -e
 
@@ -10,33 +11,36 @@ cd "$APP_DIR"
 
 echo "=========================================="
 echo "  sol-tracker 部署中..."
+if [ -n "$CI" ]; then
+    echo "  (CI/CD 自动部署模式)"
+fi
 echo "=========================================="
 
 # --- 1. 拉取最新代码 ---
 echo ""
-echo "[1/5] 拉取最新代码..."
+echo "[1/6] 拉取最新代码..."
 git pull origin main
 
 # --- 2. 安装依赖 ---
 echo ""
-echo "[2/5] 安装依赖..."
+echo "[2/6] 安装依赖..."
 npm ci --production=false
 
 # --- 3. 构建项目 ---
 echo ""
-echo "[3/5] 构建 Next.js..."
+echo "[3/6] 构建 Next.js..."
 npm run build
 
 # --- 4. 复制静态资源到 standalone 目录 ---
 echo ""
-echo "[4/5] 处理静态资源..."
+echo "[4/6] 处理静态资源..."
 # standalone 模式需要手动复制 public 和 static 文件
 cp -r public .next/standalone/public 2>/dev/null || true
 cp -r .next/static .next/standalone/.next/static
 
 # --- 5. 启动/重启 PM2 ---
 echo ""
-echo "[5/5] 启动应用..."
+echo "[5/6] 启动应用..."
 if pm2 describe sol-tracker > /dev/null 2>&1; then
     echo "  重启现有进程..."
     pm2 restart ecosystem.config.js
@@ -60,6 +64,26 @@ if [ ! -f "$NGINX_CONF" ]; then
 else
     echo "  Nginx 配置已存在，跳过"
 fi
+
+# --- 6. 健康检查 ---
+echo ""
+echo "[6/6] 健康检查..."
+MAX_RETRIES=10
+RETRY_INTERVAL=3
+for i in $(seq 1 $MAX_RETRIES); do
+    if curl -sf -o /dev/null http://127.0.0.1:3000; then
+        echo "  ✅ 应用已启动，健康检查通过 (第 ${i} 次尝试)"
+        break
+    fi
+    if [ "$i" -eq "$MAX_RETRIES" ]; then
+        echo "  ❌ 健康检查失败：应用未在 $((MAX_RETRIES * RETRY_INTERVAL)) 秒内响应"
+        echo "  PM2 日志:"
+        pm2 logs sol-tracker --lines 20 --nostream
+        exit 1
+    fi
+    echo "  等待应用启动... (${i}/${MAX_RETRIES})"
+    sleep $RETRY_INTERVAL
+done
 
 echo ""
 echo "=========================================="

@@ -1,0 +1,74 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # 支持手动触发
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: 🔍 Lint Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run lint
+        run: npm run lint
+
+  deploy:
+    name: 🚀 Deploy to VPS
+    needs: lint
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script_stop: true
+          script: |
+            echo "=========================================="
+            echo "  🚀 CI/CD 自动部署开始"
+            echo "  触发: ${{ github.event_name }}"
+            echo "  提交: ${{ github.sha }}"
+            echo "  分支: ${{ github.ref_name }}"
+            echo "=========================================="
+            
+            cd /opt/sol-tracker
+            bash deploy/deploy.sh
+
+      - name: Deployment Summary
+        if: success()
+        run: |
+          echo "## ✅ 部署成功" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| 项目 | 信息 |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| **分支** | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **提交** | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **触发者** | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **时间** | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |" >> $GITHUB_STEP_SUMMARY
+
+      - name: Deployment Failed
+        if: failure()
+        run: |
+          echo "## ❌ 部署失败" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "请检查 VPS 连接和部署日志。" >> $GITHUB_STEP_SUMMARY
