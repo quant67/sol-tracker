@@ -7,10 +7,27 @@ interface TokenInfo {
     marketCap: number | null;  // USD market cap
 }
 
-const tokenCache = new Map<string, TokenInfo>();
+const TTL_MS = 60 * 1000; // 60 seconds
 
-// Well-known tokens (market cap fetched dynamically)
-const KNOWN_TOKENS: Record<string, { symbol: string; name: string }> = {
+// 1. Static Token Info (Never expires for Name/Symbol)
+interface StaticInfo {
+    symbol: string;
+    name: string;
+}
+const staticCache = new Map<string, StaticInfo>();
+
+// 2. Dynamic Market Cap (Expires every 60s)
+interface MarketCapEntry {
+    marketCap: number | null;
+    timestamp: number;
+}
+const mcapCache = new Map<string, MarketCapEntry>();
+
+// 3. Promise Deduplication (Prevents stampeding API requests)
+const pendingRequests = new Map<string, Promise<TokenInfo>>();
+
+// Pre-fill known tokens
+const KNOWN_TOKENS: Record<string, StaticInfo> = {
     'So11111111111111111111111111111111111111112': { symbol: 'SOL', name: 'Solana' },
     'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v': { symbol: 'USDC', name: 'USD Coin' },
     'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB': { symbol: 'USDT', name: 'Tether USD' },
@@ -24,14 +41,52 @@ const KNOWN_TOKENS: Record<string, { symbol: string; name: string }> = {
     '7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs': { symbol: 'MAXXING', name: 'Maxxing' },
 };
 
-export async function resolveTokenInfo(mint: string): Promise<TokenInfo> {
-    // 1. Check cache (includes market cap)
-    if (tokenCache.has(mint)) return tokenCache.get(mint)!;
+Object.entries(KNOWN_TOKENS).forEach(([mint, info]) => {
+    staticCache.set(mint, info);
+});
 
-    // 2. Try DexScreener — returns symbol + market cap
+export async function resolveTokenInfo(mint: string): Promise<TokenInfo> {
+    // 1. Check if we have a fresh Market Cap cache
+    const cachedStatic = staticCache.get(mint);
+    const cachedMcap = mcapCache.get(mint);
+
+    if (cachedStatic && cachedMcap) {
+        const age = Date.now() - cachedMcap.timestamp;
+        if (age < TTL_MS) {
+            return {
+                symbol: cachedStatic.symbol,
+                name: cachedStatic.name,
+                marketCap: cachedMcap.marketCap
+            };
+        }
+    }
+
+    // 2. If already fetching in another concurrent Webhook call, wait for it
+    if (pendingRequests.has(mint)) {
+        return pendingRequests.get(mint)!;
+    }
+
+    // 3. Otherwise, fetch fresh data and deduplicate concurrent calls
+    const requestPromise = fetchFreshTokenInfo(mint, cachedStatic);
+    pendingRequests.set(mint, requestPromise);
+
+    try {
+        const info = await requestPromise;
+        return info;
+    } finally {
+        pendingRequests.delete(mint); // Always clean up
+    }
+}
+
+async function fetchFreshTokenInfo(mint: string, existingStatic?: StaticInfo): Promise<TokenInfo> {
+    let freshStatic = existingStatic;
+    let freshMarketCap: number | null = null;
+    let fallbackHit = false;
+
+    // A. DexScreener (Provides both Static Info and Market Cap)
     try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 5000);
+        const timeout = setTimeout(() => controller.abort(), 4000);
 
         const dexRes = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`, {
             signal: controller.signal,
@@ -41,6 +96,7 @@ export async function resolveTokenInfo(mint: string): Promise<TokenInfo> {
         if (dexRes.ok) {
             const data = await dexRes.json();
             if (data?.pairs && data.pairs.length > 0) {
+                // Find highest liquidity pair
                 const pair = data.pairs[0];
                 const tokenData = pair.baseToken?.address === mint
                     ? pair.baseToken
@@ -49,13 +105,11 @@ export async function resolveTokenInfo(mint: string): Promise<TokenInfo> {
                         : null;
 
                 if (tokenData?.symbol) {
-                    const info: TokenInfo = {
+                    freshStatic = {
                         symbol: tokenData.symbol,
-                        name: tokenData.name || tokenData.symbol,
-                        marketCap: pair.marketCap || pair.fdv || null,
+                        name: tokenData.name || tokenData.symbol
                     };
-                    tokenCache.set(mint, info);
-                    return info;
+                    freshMarketCap = pair.marketCap || pair.fdv || null;
                 }
             }
         }
@@ -63,39 +117,53 @@ export async function resolveTokenInfo(mint: string): Promise<TokenInfo> {
         console.warn(`DexScreener lookup failed for ${mint.slice(0, 8)}: ${err.message}`);
     }
 
-    // 3. Known tokens fallback (no market cap)
-    if (KNOWN_TOKENS[mint]) {
-        const info: TokenInfo = { ...KNOWN_TOKENS[mint], marketCap: null };
-        tokenCache.set(mint, info);
-        return info;
-    }
+    // B. Jupiter Fallback (Only provides Static Info, no Market Cap)
+    if (!freshStatic) {
+        try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 3000);
 
-    // 4. Try Jupiter
-    try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 5000);
+            const jupRes = await fetch(`https://tokens.jup.ag/token/${mint}`, {
+                signal: controller.signal,
+            });
+            clearTimeout(timeout);
 
-        const jupRes = await fetch(`https://tokens.jup.ag/token/${mint}`, {
-            signal: controller.signal,
-        });
-        clearTimeout(timeout);
-
-        if (jupRes.ok) {
-            const data = await jupRes.json();
-            if (data?.symbol) {
-                const info: TokenInfo = { symbol: data.symbol, name: data.name || data.symbol, marketCap: null };
-                tokenCache.set(mint, info);
-                return info;
+            if (jupRes.ok) {
+                const data = await jupRes.json();
+                if (data?.symbol) {
+                    freshStatic = { symbol: data.symbol, name: data.name || data.symbol };
+                }
             }
+        } catch (err: any) {
+            console.warn(`Jupiter lookup failed for ${mint.slice(0, 8)}: ${err.message}`);
         }
-    } catch (err: any) {
-        console.warn(`Jupiter lookup failed for ${mint.slice(0, 8)}: ${err.message}`);
     }
 
-    // 5. Fallback
-    const fallback: TokenInfo = { symbol: `${mint.slice(0, 4)}...${mint.slice(-4)}`, name: 'Unknown Token', marketCap: null };
-    tokenCache.set(mint, fallback);
-    return fallback;
+    // C. Ultimate Fallback (Address slice)
+    if (!freshStatic) {
+        freshStatic = {
+            symbol: `${mint.slice(0, 4)}...${mint.slice(-4)}`,
+            name: 'Unknown Token'
+        };
+        fallbackHit = true;
+    }
+
+    // Update caches
+    if (!fallbackHit) {
+        staticCache.set(mint, freshStatic);
+    }
+
+    // Always update Market Cap cache to avoid tight-loops even on failure
+    mcapCache.set(mint, {
+        marketCap: freshMarketCap,
+        timestamp: Date.now()
+    });
+
+    return {
+        symbol: freshStatic.symbol,
+        name: freshStatic.name,
+        marketCap: freshMarketCap
+    };
 }
 
 export function formatTokenAmount(amount: number): string {
