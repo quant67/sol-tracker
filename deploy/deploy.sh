@@ -6,6 +6,13 @@
 # ============================================
 set -e
 
+# 确保非交互式 SSH 登录时能找到 node/npm
+# (GitHub Actions SSH 不加载 .bashrc/.bash_profile)
+export PATH="/usr/local/bin:/usr/bin:$HOME/.nvm/versions/node/$(ls $HOME/.nvm/versions/node/ 2>/dev/null | tail -1)/bin:$PATH"
+[ -f "$HOME/.bashrc" ] && source "$HOME/.bashrc" 2>/dev/null || true
+[ -f "$HOME/.bash_profile" ] && source "$HOME/.bash_profile" 2>/dev/null || true
+[ -f "$HOME/.profile" ] && source "$HOME/.profile" 2>/dev/null || true
+
 APP_DIR="/opt/sol-tracker"
 cd "$APP_DIR"
 
