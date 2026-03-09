@@ -78,60 +78,103 @@ export function RecentActivity() {
                         <TableHeader>
                             <TableRow className="border-border hover:bg-transparent">
                                 <TableHead className="text-muted-foreground font-medium">Type</TableHead>
+                                <TableHead className="text-muted-foreground font-medium">Trader</TableHead>
                                 <TableHead className="text-muted-foreground font-medium">Token</TableHead>
                                 <TableHead className="text-muted-foreground font-medium">Amount</TableHead>
-                                <TableHead className="text-muted-foreground font-medium">SOL</TableHead>
-                                <TableHead className="text-muted-foreground font-medium text-right">Time/TX</TableHead>
+                                <TableHead className="text-muted-foreground font-medium">Cost / MCap</TableHead>
+                                <TableHead className="text-muted-foreground font-medium text-right">Time</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {logs.map((log) => {
                                 const typeInfo = getTypeInfo(log.type);
                                 const dexName = getDexName(log.type);
-                                const tokenMint = log.token_info?.mint;
+                                const tokenInfo = log.token_info || {};
+                                const tokenMint = tokenInfo.mint;
+
+                                // New fields from DB or Fallback
+                                const symbol = tokenInfo.symbol || (tokenMint ? `${tokenMint.slice(0, 4)}...` : 'Unknown');
+                                const traderName = tokenInfo.personName || 'Unknown';
+
+                                // Format Market Cap
+                                const formatMCap = (mc: number | undefined) => {
+                                    if (!mc) return null;
+                                    if (mc >= 1_000_000) return `$${(mc / 1_000_000).toFixed(1)}M`;
+                                    if (mc >= 1_000) return `$${(mc / 1_000).toFixed(1)}K`;
+                                    return `$${mc.toFixed(0)}`;
+                                };
+                                const mCapStr = formatMCap(tokenInfo.marketCap);
+
                                 return (
                                     <TableRow key={log.id} className="border-border hover:bg-muted/40 group transition-colors">
                                         <TableCell>
                                             <div className="flex items-center gap-2">
-                                                <div className={`w-8 h-8 rounded-lg ${typeInfo.bg} flex items-center justify-center ${typeInfo.color}`}>
+                                                <div className={`shrink-0 w-8 h-8 rounded-lg ${typeInfo.bg} flex items-center justify-center ${typeInfo.color}`}>
                                                     {typeInfo.icon}
                                                 </div>
                                                 <div className="flex flex-col">
-                                                    <span className={`font-bold text-xs tracking-wider ${typeInfo.color}`}>{typeInfo.label}</span>
-                                                    {dexName && <span className="text-[10px] text-muted-foreground">{dexName}</span>}
+                                                    <span className={`font-bold text-[11px] leading-tight tracking-wider ${typeInfo.color}`}>{typeInfo.label}</span>
+                                                    {dexName && <span className="text-[9px] leading-tight text-muted-foreground truncate max-w-[60px]">{dexName}</span>}
                                                 </div>
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            {tokenMint ? (
-                                                <a
-                                                    href={`https://birdeye.so/token/${tokenMint}`}
-                                                    target="_blank"
-                                                    className="text-sm font-mono text-foreground/80 hover:text-indigo-400 transition-colors"
-                                                >
-                                                    {tokenMint.slice(0, 4)}...{tokenMint.slice(-4)}
-                                                </a>
-                                            ) : (
-                                                <span className="text-sm text-muted-foreground">{log.address?.slice(0, 4)}...</span>
-                                            )}
+                                            <div className="flex items-center gap-1.5">
+                                                <div className="w-5 h-5 rounded-full bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">
+                                                    <span className="text-[10px] font-bold text-indigo-400">
+                                                        {traderName.charAt(0).toUpperCase()}
+                                                    </span>
+                                                </div>
+                                                <span className="text-xs font-medium text-foreground/90">{traderName}</span>
+                                            </div>
                                         </TableCell>
                                         <TableCell>
-                                            <span className="text-sm font-mono text-foreground/70">{formatAmount(log)}</span>
+                                            <div className="flex flex-col">
+                                                {tokenMint ? (
+                                                    <a
+                                                        href={`https://dexscreener.com/solana/${tokenMint}`}
+                                                        target="_blank"
+                                                        title="View on DexScreener"
+                                                        className="text-sm font-bold text-foreground hover:text-indigo-400 transition-colors flex items-center gap-1 w-fit"
+                                                    >
+                                                        {symbol}
+                                                        <ExternalLink className="w-2.5 h-2.5 opacity-50" />
+                                                    </a>
+                                                ) : (
+                                                    <span className="text-sm font-bold text-foreground">{symbol}</span>
+                                                )}
+                                                {tokenInfo.name && tokenInfo.name !== symbol && (
+                                                    <span className="text-[10px] text-muted-foreground truncate max-w-[80px]">
+                                                        {tokenInfo.name}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </TableCell>
                                         <TableCell>
-                                            <span className="text-sm font-mono text-foreground/70">
-                                                {log.amount && parseFloat(log.amount) > 0 ? `${parseFloat(log.amount).toFixed(4)}` : '-'}
-                                            </span>
+                                            <span className="text-xs font-mono font-medium text-foreground/80">{formatAmount(log)}</span>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-col">
+                                                <span className="text-xs font-mono font-medium text-foreground/80">
+                                                    {log.amount && parseFloat(log.amount) > 0 ? `${parseFloat(log.amount).toFixed(3)} SOL` : '-'}
+                                                </span>
+                                                {mCapStr && (
+                                                    <span className="text-[10px] font-mono text-muted-foreground">
+                                                        MC: {mCapStr}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex flex-col items-end">
-                                                <span className="text-xs text-muted-foreground">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                                                <span className="text-xs font-medium text-muted-foreground">{new Date(log.timestamp).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
                                                 <a
                                                     href={`https://solscan.io/tx/${log.signature}`}
                                                     target="_blank"
-                                                    className="text-[10px] text-muted-foreground/60 hover:text-indigo-500 dark:hover:text-indigo-400 font-mono mt-0.5 flex items-center gap-0.5 transition-colors"
+                                                    title="View TX on Solscan"
+                                                    className="text-[10px] text-muted-foreground/50 hover:text-indigo-500 dark:hover:text-indigo-400 font-mono mt-0.5 flex items-center transition-colors"
                                                 >
-                                                    {log.signature?.slice(0, 8)}... <ExternalLink className="w-2 h-2" />
+                                                    TX ↗
                                                 </a>
                                             </div>
                                         </TableCell>

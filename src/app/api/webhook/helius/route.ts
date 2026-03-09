@@ -89,6 +89,11 @@ export async function POST(req: NextRequest) {
                 'SUCCESS'
             );
 
+            // Resolve token info BEFORE inserting into DB to save it
+            // Since our resolver has deduplication and cache, this is extremely fast and safe.
+            const { resolveTokenInfo } = await import('@/lib/token-resolver');
+            const tokenInfoData = await resolveTokenInfo(swap.tokenMint);
+
             // Store in DB
             const { error: logError } = await supabase
                 .from('logs')
@@ -104,6 +109,10 @@ export async function POST(req: NextRequest) {
                         costAmount: swap.costAmount,
                         costSymbol: swap.costSymbol,
                         personName: matchedEntry.personName,
+                        // New fields for Dashboard
+                        symbol: tokenInfoData.symbol,
+                        name: tokenInfoData.name,
+                        marketCap: tokenInfoData.marketCap
                     },
                     amount: swap.costAmount.toString(),
                     timestamp: new Date().toISOString(),
