@@ -27,7 +27,6 @@ function StatCard({ label, value, increase, icon }: { label: string, value: stri
 }
 
 export function DashboardStats() {
-    const [mounted, setMounted] = useState(false);
     const [stats, setStats] = useState({
         totalMonitored: 0,
         todaySignals: 0,
@@ -47,31 +46,11 @@ export function DashboardStats() {
     }, []);
 
     useEffect(() => {
-        setMounted(true);
         fetchStats();
 
         const interval = setInterval(fetchStats, POLL_INTERVAL);
         return () => clearInterval(interval);
     }, [fetchStats]);
-
-    if (!mounted) {
-        return (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <StatCard
-                    label="Total Monitored"
-                    value="0"
-                    increase="loading..."
-                    icon={<Target className="w-5 h-5 text-indigo-400" />}
-                />
-                <StatCard
-                    label="Today's Signals"
-                    value="0"
-                    increase="loading..."
-                    icon={<Zap className="w-5 h-5 text-amber-400" />}
-                />
-            </div>
-        );
-    }
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

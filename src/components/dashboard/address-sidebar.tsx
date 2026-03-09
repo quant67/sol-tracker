@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import {
-    Plus, Trash2, Loader2, Pencil, Check, X,
+    Trash2, Loader2, Pencil, Check, X,
     Eye, EyeOff, ChevronDown, ChevronRight, UserPlus, Wallet
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -65,7 +65,7 @@ export function AddressSidebar() {
     const toggleExpand = (id: string) => {
         setExpandedIds(prev => {
             const next = new Set(prev);
-            next.has(id) ? next.delete(id) : next.add(id);
+            if (next.has(id)) { next.delete(id); } else { next.add(id); }
             return next;
         });
     };
