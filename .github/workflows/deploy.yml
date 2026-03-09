@@ -43,15 +43,27 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
           script: |
-            echo "=========================================="
+            echo "==========================================="
             echo "  🚀 CI/CD 自动部署开始"
             echo "  触发: ${{ github.event_name }}"
             echo "  提交: ${{ github.sha }}"
             echo "  分支: ${{ github.ref_name }}"
-            echo "=========================================="
+            echo "==========================================="
+            
+            # 加载环境变量（非交互式 SSH 不自动加载）
+            source ~/.bashrc 2>/dev/null || true
+            source ~/.bash_profile 2>/dev/null || true
+            source ~/.profile 2>/dev/null || true
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
+            
+            # 调试：确认 node/npm 可用
+            echo "PATH: $PATH"
+            echo "Node: $(which node 2>/dev/null || echo 'NOT FOUND')"
+            echo "NPM:  $(which npm 2>/dev/null || echo 'NOT FOUND')"
             
             cd /opt/sol-tracker
-            bash deploy/deploy.sh
+            bash -l deploy/deploy.sh
 
       - name: Deployment Summary
         if: success()
