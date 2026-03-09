@@ -233,7 +233,7 @@ erDiagram
 |---|---|---|
 | ~~**无鉴权**~~ | ✅ 已解决 | Middleware + Cookie 鉴权，密码登录 |
 | ~~**Anon Key 暴露**~~ | ✅ 已解决 | 去掉 `NEXT_PUBLIC_` 前缀，前端通过 API 路由获取数据 |
-| **Token 缓存无 TTL** | `tokenCache` 是内存 Map，永不过期 | 添加过期机制（如 10 分钟后删除），避免市值数据陈旧 |
+| ~~**Token 缓存无 TTL**~~ | ✅ 已解决 | 采用静动分离缓存：Symbol永久缓存，市值(MarketCap) 60秒 TTL + 防雪崩并发去重 |
 | **日志写文件** | `logger.ts` 用 `appendFileSync` 同步写文件 | standalone 模式下 `process.cwd()` 可能不对；应改用 PM2 日志 或结构化日志 |
 
 ### 🟡 中优先级
@@ -275,7 +275,7 @@ erDiagram
 |---|---|---|
 | ~~**用户认证**~~ | ✅ 已实现：密码登录 + Middleware 鉴权 | — |
 | **HTTPS** | 绑定域名 + Let's Encrypt 免费证书 | ⭐ |
-| **CI/CD** | GitHub Actions：push → 自动部署到 VPS | ⭐⭐ |
+| ~~**CI/CD**~~ | ✅ 已实现：GitHub Actions push → main 自动部署 | — |
 | **监控告警** | PM2 + UptimeRobot 监控应用存活，宕机时通知 | ⭐ |
 | **日志系统** | 用 Supabase 存日志代替文件日志，可在 Dashboard 中查看 | ⭐⭐ |
 | **数据库备份** | 定期备份 Supabase 数据 | ⭐ |
