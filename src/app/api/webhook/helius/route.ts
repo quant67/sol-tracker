@@ -36,6 +36,15 @@ export async function POST(req: NextRequest) {
             throw fetchError;
         }
 
+        // Fetch min_mc_threshold
+        const { data: mcSetting } = await supabase
+            .from('app_settings')
+            .select('value')
+            .eq('key', 'min_mc_threshold')
+            .single();
+        
+        const minMcThreshold = mcSetting?.value ? parseFloat(mcSetting.value) : 0;
+
         // Build address → { originalAddress, personName, addrLabel } map
         const addressMap = new Map<string, { address: string; personName: string; addrLabel: string }>();
         for (const a of monitoredAddresses || []) {
@@ -130,8 +139,13 @@ export async function POST(req: NextRequest) {
 
             // Send Telegram alert
             try {
-                const alertMessage = await formatSwapAlert(swap);
-                await sendTelegramAlert(alertMessage);
+                const mc = tokenInfoData.marketCap || 0;
+                if (mc >= minMcThreshold) {
+                    const alertMessage = await formatSwapAlert(swap);
+                    await sendTelegramAlert(alertMessage);
+                } else {
+                    logToFile(`Skipped Telegram alert for ${signature.slice(0, 8)}: MC ${mc} < Threshold ${minMcThreshold}`, 'INFO');
+                }
             } catch (alertError: any) {
                 logToFile(`Alert error: ${alertError.message}`, 'ERROR');
             }

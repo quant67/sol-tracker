@@ -19,5 +19,21 @@ module.exports = {
             out_file: '/opt/sol-tracker/logs/out.log',
             merge_logs: true,
         },
+        {
+            name: 'sol-tracker-bot',
+            script: 'npm',
+            args: 'run bot',
+            cwd: '/opt/sol-tracker',
+            env: {
+                NODE_ENV: 'production',
+            },
+            exec_mode: 'fork',
+            autorestart: true,
+            watch: false,
+            log_date_format: 'YYYY-MM-DD HH:mm:ss',
+            error_file: '/opt/sol-tracker/logs/bot-error.log',
+            out_file: '/opt/sol-tracker/logs/bot-out.log',
+            merge_logs: true,
+        }
     ],
 };
