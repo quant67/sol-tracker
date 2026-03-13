@@ -49,15 +49,17 @@ sol-tracker/
 ├── scripts/
 │   ├── manage-webhook.js             # 手动管理 Helius Webhook
 │   ├── sync-helius.js                # 手动同步地址到 Helius
-│   └── check-helius.js               # Helius 状态检查
+│   ├── check-helius.js               # Helius 状态检查
+│   └── tg-bot.ts                     # ⭐ 独立运行的 Telegram Bot
 ├── supabase/
 │   ├── schema.sql                    # 完整数据库 Schema
-│   └── migration-people.sql          # People 表迁移脚本
+│   ├── migration-people.sql          # People 表迁移脚本
+│   └── migration-settings.sql        # app_settings 表迁移脚本
 ├── deploy/                           # VPS 部署配置
 │   ├── nginx.conf
 │   ├── setup-server.sh
 │   └── deploy.sh
-└── ecosystem.config.js               # PM2 配置
+└── ecosystem.config.js               # PM2 配置 (包含 Next.js 和 Bot 进程)
 ```
 
 ---
@@ -89,10 +91,11 @@ graph TB
         DB_ADDR["addresses 表"]
         DB_LOGS["logs 表"]
         DB_PPL["people 表"]
+        DB_SET["app_settings 表"]
     end
 
     subgraph External["外部服务"]
-        TG["Telegram Bot"]
+        TG["Telegram API"]
         DEX["DexScreener API"]
     end
 
@@ -105,6 +108,7 @@ graph TB
     WH -->|"POST JSON"| NGINX
     NGINX --> NEXT
     NEXT --> API_WH
+    API_WH -->|"查阈值"| DB_SET
     API_WH --> PARSER
     PARSER -->|"解析 Swap"| DB_LOGS
     PARSER --> TG_LIB
@@ -113,6 +117,11 @@ graph TB
     TG_LIB -->|"发送消息"| TG
     AUTH -->|"Cookie 验证"| DASH
     DASH -->|"API 轮询 (5s)"| NEXT
+    
+    %% 独立 Bot 进程
+    TG_BOT["tg-bot.ts (PM2)"]
+    TG -->|"用户消息 /setmc"| TG_BOT
+    TG_BOT -->|"更新阈值"| DB_SET
 ```
 
 ### 3.2 Helius Webhook 工作原理
@@ -153,14 +162,20 @@ sequenceDiagram
    - 如果钱包 **收到** target token → `BUY`
    - 如果钱包 **发出** target token → `SELL`
 
-### 3.3 Telegram 推送原理
+### 3.3 Telegram 推送原理与交互 Bot
 
-[telegram.ts](file:///Users/sixseven/dev/ai-coding/sol-tracker/src/lib/telegram.ts) 的工作：
+本项目包含两个与 Telegram 交互的部分：
 
-1. 收到 `ParsedSwap` 数据后，调用 [token-resolver.ts](file:///Users/sixseven/dev/ai-coding/sol-tracker/src/lib/token-resolver.ts) 获取 Token 名称和市值
-2. **Token 信息解析优先级**：内存缓存 → DexScreener API → 硬编码已知 Token → Jupiter API → 地址缩写 fallback
-3. 格式化为 HTML 消息（包含 BUY/SELL 图标、Token 名称、金额、市值、Solscan/Birdeye/DexScreener 链接）
-4. 通过 Telegram Bot API `sendMessage` 发送到指定 `CHAT_ID`
+1. **推送服务 (Webhook -> Telegram)**
+   `telegram.ts` 被 Webhook 路由调用执行：
+   - 收到 `ParsedSwap` 数据后，调用 `token-resolver.ts` 获取 Token 名称和市值
+   - 从 `app_settings` 读取 `min_mc_threshold` 进行市值过滤，未达标跳过发送
+   - 格式化为 HTML 消息发送到指定 `CHAT_ID`
+
+2. **交互式 Bot (`scripts/tg-bot.ts`)**
+   - 作为一个脱离 Next.js 的独立长轮询进程运行（通过 PM2 的 `sol-tracker-bot` 托管）
+   - 基于 `telegraf` 开发，监听用户的 `/setmc <金额>` 等交互命令
+   - 直接连接 Supabase 数据库将用户设置持久化写入 `app_settings` 表
 
 ### 3.4 Dashboard 数据更新
 
@@ -183,6 +198,12 @@ sequenceDiagram
 erDiagram
     people ||--o{ addresses : "has"
     addresses ||--o{ logs : "generates"
+
+    app_settings {
+        TEXT key PK
+        TEXT value
+        TIMESTAMPTZ updated_at
+    }
 
     people {
         UUID id PK
@@ -265,8 +286,7 @@ erDiagram
 | **盈亏分析** | 记录每笔 BUY 的成本，SELL 时计算盈亏比 | ⭐⭐⭐ |
 | **Token 持仓面板** | 展示每个监控钱包当前持有的 Token 列表和价值 | ⭐⭐⭐ |
 | **历史交易图表** | 用图表展示交易频率、资金流向趋势 | ⭐⭐ |
-| **多 Chat 推送** | 支持将不同 Person 的交易推送到不同 Telegram 群 | ⭐⭐ |
-| **过滤规则** | 支持按金额/Token/DEX 过滤，只推送符合条件的交易 | ⭐⭐ |
+| **过滤规则** | 支持按金额/Token/DEX 过滤，只推送符合条件交易（市值过滤已实现） | ⭐⭐ |
 | **Webhook 签名验证** | 验证请求确实来自 Helius，防伪造 | ⭐ |
 
 ### 🛡️ 工程改进
