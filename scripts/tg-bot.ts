@@ -4,11 +4,17 @@ import * as dotenv from 'dotenv';
 import * as path from 'path';
 
 // Load environment variables from .env
-dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+const envPath = path.resolve(process.cwd(), '.env');
+const fallbackEnvPath = path.resolve(__dirname, '..', '.env');
+dotenv.config({ path: envPath });
+// If not found, try the fallback path
+if (!process.env.TELEGRAM_BOT_TOKEN) {
+    dotenv.config({ path: fallbackEnvPath });
+}
 
 const botToken = process.env.TELEGRAM_BOT_TOKEN;
 if (!botToken) {
-    console.error('Missing TELEGRAM_BOT_TOKEN');
+    console.error(`Missing TELEGRAM_BOT_TOKEN. Looked in ${envPath} and ${fallbackEnvPath}`);
     process.exit(1);
 }
 
