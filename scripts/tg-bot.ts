@@ -2,19 +2,34 @@ import { Telegraf } from 'telegraf';
 import { createClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
+import * as fs from 'fs';
 
-// Load environment variables from .env
-const envPath = path.resolve(process.cwd(), '.env');
-const fallbackEnvPath = path.resolve(__dirname, '..', '.env');
-dotenv.config({ path: envPath });
-// If not found, try the fallback path
-if (!process.env.TELEGRAM_BOT_TOKEN) {
-    dotenv.config({ path: fallbackEnvPath });
+// Load environment variables from .env manually to ensure override
+const envPaths = [
+    path.resolve(process.cwd(), '.env'),
+    path.resolve(__dirname, '..', '.env'),
+];
+
+let envLoaded = false;
+for (const p of envPaths) {
+    if (fs.existsSync(p)) {
+        console.log(`Loading env from: ${p}`);
+        const envConfig = dotenv.parse(fs.readFileSync(p));
+        for (const k in envConfig) {
+            process.env[k] = envConfig[k];
+        }
+        envLoaded = true;
+        break;
+    }
+}
+
+if (!envLoaded) {
+    console.warn('⚠️ No .env file found in expected paths.');
 }
 
 const botToken = process.env.TELEGRAM_BOT_TOKEN;
 if (!botToken) {
-    console.error(`Missing TELEGRAM_BOT_TOKEN. Looked in ${envPath} and ${fallbackEnvPath}`);
+    console.error('Missing TELEGRAM_BOT_TOKEN.');
     process.exit(1);
 }
 
@@ -22,7 +37,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
-    console.error('Missing Supabase credentials');
+    console.error(`Missing Supabase credentials. URL exists: ${!!supabaseUrl}, Key exists: ${!!supabaseKey}`);
     process.exit(1);
 }
 
