@@ -97,6 +97,11 @@ bot.start((ctx) => {
     ctx.reply('Welcome to Sol Tracker Bot!\n\nCommands:\n/setmc <amount> - Set minimum market cap for alerts (e.g. 500k, 1m)');
 });
 
+// Register bot commands to show up in the Telegram menu
+bot.telegram.setMyCommands([
+    { command: 'setmc', description: 'Set minimum market cap for alerts (e.g. 500k)' }
+]).catch(err => console.error('Failed to set bot commands:', err));
+
 bot.launch().then(() => {
     console.log('🤖 Telegram Bot is running...');
 }).catch((err) => {
