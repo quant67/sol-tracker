@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2, Plus, Pause, Play, Trash2 } from "lucide-react";
 
-type StrategyType = "pct_change_up" | "pct_change_down" | "breakout_up" | "breakout_down";
+type StrategyType = "pct_change_up" | "pct_change_down" | "breakout_up" | "breakout_down" | "entry_long";
 
 interface WatchToken {
     id: string;
@@ -63,6 +63,12 @@ export function PriceStrategyManager() {
     const [windowMin, setWindowMin] = useState("5");
     const [thresholdPct, setThresholdPct] = useState("10");
     const [targetPrice, setTargetPrice] = useState("");
+    const [lookbackMin, setLookbackMin] = useState("30");
+    const [fastWindowMin, setFastWindowMin] = useState("5");
+    const [slowWindowMin, setSlowWindowMin] = useState("15");
+    const [entryTargetPct, setEntryTargetPct] = useState("10");
+    const [breakoutTolerancePct, setBreakoutTolerancePct] = useState("1.5");
+    const [minTrendPct, setMinTrendPct] = useState("2");
     const [cooldownSec, setCooldownSec] = useState("300");
     const [chatId, setChatId] = useState("");
 
@@ -199,6 +205,34 @@ export function PriceStrategyManager() {
                 return;
             }
             params = { windowMin: windowNum, thresholdPct: thresholdNum };
+        } else if (strategyType === "entry_long") {
+            const lookbackNum = Number(lookbackMin || "0");
+            const fastNum = Number(fastWindowMin || "0");
+            const slowNum = Number(slowWindowMin || "0");
+            const targetNum = Number(entryTargetPct || "0");
+            const breakoutPctNum = Number(breakoutTolerancePct || "0");
+            const trendPctNum = Number(minTrendPct || "0");
+
+            if (
+                !Number.isFinite(lookbackNum) || lookbackNum <= 0 ||
+                !Number.isFinite(fastNum) || fastNum <= 0 ||
+                !Number.isFinite(slowNum) || slowNum <= 0 ||
+                !Number.isFinite(targetNum) || targetNum <= 0 ||
+                !Number.isFinite(breakoutPctNum) || breakoutPctNum < 0 ||
+                !Number.isFinite(trendPctNum) || trendPctNum < 0
+            ) {
+                setErrorMessage("Entry signal parameters must be valid positive numbers.");
+                return;
+            }
+
+            params = {
+                lookbackMin: lookbackNum,
+                fastWindowMin: fastNum,
+                slowWindowMin: slowNum,
+                targetPct: targetNum,
+                breakoutTolerancePct: breakoutPctNum,
+                minTrendPct: trendPctNum,
+            };
         } else {
             const target = Number(targetPrice || "0");
             if (!Number.isFinite(target) || target <= 0) {
@@ -394,6 +428,7 @@ export function PriceStrategyManager() {
                                     <option value="pct_change_down">pct_change_down</option>
                                     <option value="breakout_up">breakout_up</option>
                                     <option value="breakout_down">breakout_down</option>
+                                    <option value="entry_long">entry_long</option>
                                 </select>
                             </div>
                         </div>
@@ -416,6 +451,39 @@ export function PriceStrategyManager() {
                                 <div>
                                     <label className="text-[11px] text-muted-foreground block mb-1">Threshold (%)</label>
                                     <Input value={thresholdPct} onChange={(e) => setThresholdPct(e.target.value)} />
+                                </div>
+                            </div>
+                        ) : strategyType === "entry_long" ? (
+                            <div className="space-y-2">
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label className="text-[11px] text-muted-foreground block mb-1">Lookback (min)</label>
+                                        <Input value={lookbackMin} onChange={(e) => setLookbackMin(e.target.value)} />
+                                    </div>
+                                    <div>
+                                        <label className="text-[11px] text-muted-foreground block mb-1">Target (%)</label>
+                                        <Input value={entryTargetPct} onChange={(e) => setEntryTargetPct(e.target.value)} />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label className="text-[11px] text-muted-foreground block mb-1">Fast MA (min)</label>
+                                        <Input value={fastWindowMin} onChange={(e) => setFastWindowMin(e.target.value)} />
+                                    </div>
+                                    <div>
+                                        <label className="text-[11px] text-muted-foreground block mb-1">Slow MA (min)</label>
+                                        <Input value={slowWindowMin} onChange={(e) => setSlowWindowMin(e.target.value)} />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label className="text-[11px] text-muted-foreground block mb-1">Breakout Tolerance (%)</label>
+                                        <Input value={breakoutTolerancePct} onChange={(e) => setBreakoutTolerancePct(e.target.value)} />
+                                    </div>
+                                    <div>
+                                        <label className="text-[11px] text-muted-foreground block mb-1">Min Trend (%)</label>
+                                        <Input value={minTrendPct} onChange={(e) => setMinTrendPct(e.target.value)} />
+                                    </div>
                                 </div>
                             </div>
                         ) : (

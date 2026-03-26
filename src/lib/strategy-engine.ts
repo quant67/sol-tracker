@@ -1,4 +1,4 @@
-export type StrategyType = 'pct_change_up' | 'pct_change_down' | 'breakout_up' | 'breakout_down';
+export type StrategyType = 'pct_change_up' | 'pct_change_down' | 'breakout_up' | 'breakout_down' | 'entry_long';
 
 export interface StrategyDefinition {
     id: string;
@@ -29,7 +29,7 @@ function toFiniteNumber(value: unknown): number | null {
 }
 
 export function parseStrategyType(value: unknown): StrategyType | null {
-    if (value === 'pct_change_up' || value === 'pct_change_down' || value === 'breakout_up' || value === 'breakout_down') {
+    if (value === 'pct_change_up' || value === 'pct_change_down' || value === 'breakout_up' || value === 'breakout_down' || value === 'entry_long') {
         return value;
     }
     return null;
@@ -70,11 +70,51 @@ function getThresholdPrice(params: Record<string, unknown>): number | null {
     return threshold;
 }
 
+function getLookbackMinutes(params: Record<string, unknown>): number | null {
+    const lookback = toFiniteNumber(params.lookbackMin ?? params.lookback ?? params.windowMin ?? params.window);
+    if (!lookback || lookback <= 0) return null;
+    return lookback;
+}
+
+function getFastWindowMinutes(params: Record<string, unknown>): number | null {
+    const fast = toFiniteNumber(params.fastWindowMin ?? params.fastWindow ?? params.fast ?? params.shortWindowMin);
+    if (!fast || fast <= 0) return null;
+    return fast;
+}
+
+function getSlowWindowMinutes(params: Record<string, unknown>): number | null {
+    const slow = toFiniteNumber(params.slowWindowMin ?? params.slowWindow ?? params.slow ?? params.longWindowMin);
+    if (!slow || slow <= 0) return null;
+    return slow;
+}
+
+function getBreakoutTolerancePct(params: Record<string, unknown>): number | null {
+    const pct = toFiniteNumber(params.breakoutTolerancePct ?? params.breakoutPct ?? params.tolerancePct ?? params.tolerance);
+    if (pct === null || pct < 0) return null;
+    return pct;
+}
+
+function getMinTrendPct(params: Record<string, unknown>): number | null {
+    const pct = toFiniteNumber(params.minTrendPct ?? params.trendPct ?? params.momentumPct ?? params.minMovePct);
+    if (pct === null || pct < 0) return null;
+    return pct;
+}
+
+function getTargetPct(params: Record<string, unknown>): number | null {
+    const pct = toFiniteNumber(params.targetPct ?? params.forwardTargetPct ?? params.forwardTarget ?? params.profitTargetPct);
+    if (pct === null || pct <= 0) return null;
+    return pct;
+}
+
 export function getMaxWindowMinutes(strategies: StrategyDefinition[]): number {
     let max = 0;
     for (const strategy of strategies) {
-        if (strategy.type !== 'pct_change_up' && strategy.type !== 'pct_change_down') continue;
-        const w = getWindowMinutes(strategy.params);
+        let w: number | null = null;
+        if (strategy.type === 'pct_change_up' || strategy.type === 'pct_change_down') {
+            w = getWindowMinutes(strategy.params);
+        } else if (strategy.type === 'entry_long') {
+            w = getLookbackMinutes(strategy.params);
+        }
         if (w && w > max) max = w;
     }
     return max;
@@ -132,6 +172,65 @@ export function evaluateStrategy(
                     changePct: roundedChange,
                     windowMin,
                     thresholdPct
+                }
+            };
+        }
+
+        return { triggered: false };
+    }
+
+    if (strategy.type === 'entry_long') {
+        const lookbackMin = getLookbackMinutes(strategy.params);
+        const fastWindowMin = getFastWindowMinutes(strategy.params);
+        const slowWindowMin = getSlowWindowMinutes(strategy.params);
+        const breakoutTolerancePct = getBreakoutTolerancePct(strategy.params) ?? 1.5;
+        const minTrendPct = getMinTrendPct(strategy.params) ?? 2;
+        const targetPct = getTargetPct(strategy.params) ?? 10;
+
+        if (!lookbackMin || !fastWindowMin || !slowWindowMin) return { triggered: false };
+
+        const lookbackStart = nowMs - lookbackMin * 60 * 1000;
+        const fastStart = nowMs - fastWindowMin * 60 * 1000;
+        const slowStart = nowMs - slowWindowMin * 60 * 1000;
+        const samples = history.filter((p) => p.capturedAtMs >= lookbackStart && p.price > 0);
+        if (samples.length < 4) return { triggered: false };
+
+        const fastSamples = samples.filter((p) => p.capturedAtMs >= fastStart);
+        const slowSamples = samples.filter((p) => p.capturedAtMs >= slowStart);
+        if (fastSamples.length < 2 || slowSamples.length < 2) return { triggered: false };
+
+        const fastMA = fastSamples.reduce((sum, p) => sum + p.price, 0) / fastSamples.length;
+        const slowMA = slowSamples.reduce((sum, p) => sum + p.price, 0) / slowSamples.length;
+        const recentHigh = Math.max(...samples.map((p) => p.price));
+        const recentLow = Math.min(...samples.map((p) => p.price));
+        const trendPct = ((currentPrice - recentLow) / recentLow) * 100;
+        const maSpreadPct = ((fastMA - slowMA) / slowMA) * 100;
+        const distanceFromHighPct = ((recentHigh - currentPrice) / recentHigh) * 100;
+        const breakoutReady = currentPrice >= recentHigh * (1 - breakoutTolerancePct / 100);
+        const trendReady = fastMA > slowMA && currentPrice > fastMA;
+        const momentumReady = trendPct >= minTrendPct;
+
+        if (breakoutReady && trendReady && momentumReady) {
+            return {
+                triggered: true,
+                reason: `${strategy.name}: trend up, breakout continuation likely, target +${targetPct}%`,
+                dedupeSeed: `entry_long:${lookbackMin}:${fastWindowMin}:${slowWindowMin}:${breakoutTolerancePct}:${minTrendPct}:${targetPct}`,
+                snapshot: {
+                    kind: 'entry_long',
+                    currentPrice,
+                    recentHigh,
+                    recentLow,
+                    fastMA: Number(fastMA.toFixed(8)),
+                    slowMA: Number(slowMA.toFixed(8)),
+                    maSpreadPct: Number(maSpreadPct.toFixed(3)),
+                    trendPct: Number(trendPct.toFixed(3)),
+                    distanceFromHighPct: Number(distanceFromHighPct.toFixed(3)),
+                    lookbackMin,
+                    fastWindowMin,
+                    slowWindowMin,
+                    breakoutTolerancePct,
+                    minTrendPct,
+                    targetPct
                 }
             };
         }

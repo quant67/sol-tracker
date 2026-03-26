@@ -49,6 +49,9 @@ function summarizeSnapshot(snapshot: Record<string, unknown>): string {
     if (kind === "breakout_up" || kind === "breakout_down") {
         return `threshold ${formatPrice(snapshot.thresholdPrice)}`;
     }
+    if (kind === "entry_long") {
+        return `trend ${formatPercent(snapshot.trendPct)} · target +${snapshot.targetPct}%`;
+    }
     return "-";
 }
 
@@ -118,7 +121,7 @@ export function PriceAlertHistory() {
                                 const summary = summarizeSnapshot(row.snapshot || {});
                                 const currentPrice = formatPrice(row.snapshot?.currentPrice);
                                 const strategyType = row.strategy_type || "unknown";
-                                const isUp = strategyType.includes("up");
+                                const isUp = strategyType.includes("up") || strategyType === "entry_long";
 
                                 return (
                                     <TableRow key={row.id} className="border-border hover:bg-muted/40 transition-colors">

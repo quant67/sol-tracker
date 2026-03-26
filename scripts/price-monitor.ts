@@ -170,6 +170,23 @@ function buildPriceAlertMessage(
         lines.push(`<b>Change:</b> ${formatPct(changePct)}`);
     }
 
+    if (snapshot?.kind === 'entry_long') {
+        const trendPct = toNumber(snapshot.trendPct);
+        const targetPct = toNumber(snapshot.targetPct);
+        const fastMA = toNumber(snapshot.fastMA);
+        const slowMA = toNumber(snapshot.slowMA);
+        const distanceFromHighPct = toNumber(snapshot.distanceFromHighPct);
+
+        if (trendPct !== null) lines.push(`<b>Trend:</b> ${formatPct(trendPct)}`);
+        if (distanceFromHighPct !== null) lines.push(`<b>From High:</b> ${formatPct(-distanceFromHighPct)}`);
+        if (fastMA !== null && slowMA !== null) {
+            lines.push(`<b>MA:</b> ${formatPrice(fastMA)} / ${formatPrice(slowMA)}`);
+        }
+        if (targetPct !== null) {
+            lines.push(`<b>Target:</b> +${targetPct}% follow-through`);
+        }
+    }
+
     const dexLink = `<a href="https://dexscreener.com/solana/${token.mint}">DexScreener</a>`;
     const birdeyeLink = `<a href="https://birdeye.so/token/${token.mint}">Birdeye</a>`;
     lines.push(`🔗 ${dexLink} | ${birdeyeLink}`);
@@ -271,7 +288,9 @@ async function processToken(token: WatchTokenRow, strategies: StrategyDefinition
 
     for (const strategy of strategies) {
         const evalResult = evaluateStrategy(strategy, priceData.price, previousPrice, history, nowMs);
-        if (!evalResult.triggered) continue;
+        if (!evalResult.triggered) {
+            continue;
+        }
 
         const inCooldown = await strategyInCooldown(strategy.id, strategy.cooldownSec);
         if (inCooldown) {

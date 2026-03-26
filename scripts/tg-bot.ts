@@ -100,10 +100,12 @@ function strategyUsageText(): string {
         '/strategyadd <mint> pct_change_down <windowMin> <thresholdPct> [cooldownSec]',
         '/strategyadd <mint> breakout_up <targetPrice> [cooldownSec]',
         '/strategyadd <mint> breakout_down <targetPrice> [cooldownSec]',
+        '/strategyadd <mint> entry_long <lookbackMin> <fastWindowMin> <slowWindowMin> <targetPct> [cooldownSec] [breakoutTolerancePct] [minTrendPct]',
         '',
         'Examples:',
         '/strategyadd 7vfCXT... pct_change_up 5 10 300',
         '/strategyadd 7vfCXT... breakout_down 0.00025 600',
+        '/strategyadd 7vfCXT... entry_long 30 5 15 10 300 1.5 2',
     ].join('\n');
 }
 
@@ -119,6 +121,29 @@ function buildStrategyPayload(
         const cooldownSec = parts[5] ? parsePositiveNumber(parts[5]) : 300;
         return {
             params: { windowMin, thresholdPct },
+            cooldownSec: cooldownSec ? Math.floor(cooldownSec) : 300,
+        };
+    }
+
+    if (strategyType === 'entry_long') {
+        if (parts.length < 7) return null;
+        const lookbackMin = parsePositiveNumber(parts[3]);
+        const fastWindowMin = parsePositiveNumber(parts[4]);
+        const slowWindowMin = parsePositiveNumber(parts[5]);
+        const targetPct = parsePositiveNumber(parts[6]);
+        if (!lookbackMin || !fastWindowMin || !slowWindowMin || !targetPct) return null;
+        const cooldownSec = parts[7] ? parsePositiveNumber(parts[7]) : 300;
+        const breakoutTolerancePct = parts[8] ? parsePositiveNumber(parts[8]) : 1.5;
+        const minTrendPct = parts[9] ? parsePositiveNumber(parts[9]) : 2;
+        return {
+            params: {
+                lookbackMin,
+                fastWindowMin,
+                slowWindowMin,
+                targetPct,
+                breakoutTolerancePct: breakoutTolerancePct ?? 1.5,
+                minTrendPct: minTrendPct ?? 2,
+            },
             cooldownSec: cooldownSec ? Math.floor(cooldownSec) : 300,
         };
     }
