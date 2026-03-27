@@ -60,11 +60,23 @@ interface OptimizationResponse {
 }
 
 const POLL_INTERVAL = 10000;
+const STRATEGY_TYPE_ORDER = ["entry_long", "entry_rebound", "pullback_to_ma"] as const;
 
 function formatPercent(value: number | null | undefined): string {
     if (value === null || value === undefined || !Number.isFinite(value)) return "-";
     const sign = value > 0 ? "+" : "";
     return `${sign}${value.toFixed(2)}%`;
+}
+
+function getStrategyTypeLabel(strategyType: string): string {
+    if (strategyType === "entry_long") return "Trend Continuation";
+    if (strategyType === "entry_rebound") return "Local Rebound";
+    if (strategyType === "pullback_to_ma") return "Pullback To MA";
+    return strategyType;
+}
+
+function getRecommendationKey(recommendation: Recommendation): string {
+    return `${recommendation.strategyType}-${recommendation.lookaheadMin}-${JSON.stringify(recommendation.params)}`;
 }
 
 export function StrategyOptimizerPanel() {
@@ -75,7 +87,7 @@ export function StrategyOptimizerPanel() {
     const [style, setStyle] = useState<"conservative" | "balanced" | "aggressive">("balanced");
     const [loading, setLoading] = useState(true);
     const [running, setRunning] = useState(false);
-    const [applyingRank, setApplyingRank] = useState<number | null>(null);
+    const [applyingKey, setApplyingKey] = useState<string | null>(null);
     const [errorMessage, setErrorMessage] = useState("");
     const [statusMessage, setStatusMessage] = useState("");
     const [result, setResult] = useState<OptimizationResponse | null>(null);
@@ -113,6 +125,13 @@ export function StrategyOptimizerPanel() {
     const selectedToken = useMemo(
         () => watchTokens.find((token) => token.id === selectedWatchTokenId) || null,
         [watchTokens, selectedWatchTokenId]
+    );
+
+    const featuredRecommendations = useMemo(
+        () => STRATEGY_TYPE_ORDER
+            .map((strategyType) => result?.optimization.topByType?.[strategyType] || null)
+            .filter((recommendation): recommendation is Recommendation => recommendation !== null),
+        [result]
     );
 
     const runOptimization = async () => {
@@ -165,7 +184,8 @@ export function StrategyOptimizerPanel() {
     const applyRecommendation = async (recommendation: Recommendation) => {
         if (!result?.token?.id) return;
 
-        setApplyingRank(recommendation.rank);
+        const recommendationKey = getRecommendationKey(recommendation);
+        setApplyingKey(recommendationKey);
         setErrorMessage("");
         setStatusMessage("");
 
@@ -192,7 +212,7 @@ export function StrategyOptimizerPanel() {
         } catch (error: unknown) {
             setErrorMessage(error instanceof Error ? error.message : "Unknown error");
         } finally {
-            setApplyingRank(null);
+            setApplyingKey(null);
         }
     };
 
@@ -304,7 +324,9 @@ export function StrategyOptimizerPanel() {
                             </div>
                             <div className="rounded-lg border border-border bg-muted/20 p-3">
                                 <div className="text-[11px] text-muted-foreground">Best Overall</div>
-                                <div className="text-base font-semibold text-violet-300">{result.optimization.bestOverall?.strategyType || "-"}</div>
+                                <div className="text-base font-semibold text-violet-300">
+                                    {result.optimization.bestOverall ? getStrategyTypeLabel(result.optimization.bestOverall.strategyType) : "-"}
+                                </div>
                             </div>
                         </div>
 
@@ -315,14 +337,92 @@ export function StrategyOptimizerPanel() {
                                     or switch the trading style and re-run optimization.
                                 </div>
                             )}
+                            {featuredRecommendations.length > 0 && (
+                                <div className="space-y-3">
+                                    <div>
+                                        <h3 className="text-sm font-semibold text-foreground">Best By Strategy Type</h3>
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                            Each strategy family keeps one independent best setup so you can compare continuation, rebound and pullback styles side by side.
+                                        </p>
+                                    </div>
+                                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
+                                        {featuredRecommendations.map((recommendation) => {
+                                            const recommendationKey = getRecommendationKey(recommendation);
+                                            return (
+                                                <div key={`featured-${recommendationKey}`} className="rounded-lg border border-violet-500/30 bg-violet-500/5 p-4 space-y-3">
+                                                    <div className="flex items-center justify-between gap-3">
+                                                        <div>
+                                                            <div className="text-sm font-semibold text-foreground">{getStrategyTypeLabel(recommendation.strategyType)}</div>
+                                                            <div className="text-[11px] text-muted-foreground">{recommendation.strategyType}</div>
+                                                        </div>
+                                                        <Badge variant="secondary">score {recommendation.score.toFixed(3)}</Badge>
+                                                    </div>
+
+                                                    <div className="grid grid-cols-2 gap-3 text-xs">
+                                                        <div>
+                                                            <div className="text-muted-foreground">Lookahead</div>
+                                                            <div className="font-semibold text-foreground">{recommendation.lookaheadMin}m</div>
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-muted-foreground">Resolved</div>
+                                                            <div className="font-semibold text-foreground">{recommendation.metrics.resolvedSignals}</div>
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-muted-foreground">Hit Rate</div>
+                                                            <div className="font-semibold text-foreground">{formatPercent(recommendation.metrics.hitRate)}</div>
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-muted-foreground">Avg Max Return</div>
+                                                            <div className="font-semibold text-foreground">{formatPercent(recommendation.metrics.avgMaxReturnPct)}</div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="rounded-md border border-border/60 bg-background/40 p-3 text-xs font-mono text-foreground/90 break-all">
+                                                        {JSON.stringify(recommendation.params)}
+                                                    </div>
+
+                                                    <div className="flex justify-end">
+                                                        <Button
+                                                            size="sm"
+                                                            onClick={() => applyRecommendation(recommendation)}
+                                                            disabled={applyingKey === recommendationKey}
+                                                        >
+                                                            {applyingKey === recommendationKey ? (
+                                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                            ) : (
+                                                                <WandSparkles className="w-4 h-4" />
+                                                            )}
+                                                            Apply This Strategy
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="space-y-3">
+                            {result.optimization.topRecommendations.length > 0 && (
+                                <div>
+                                    <h3 className="text-sm font-semibold text-foreground">Overall Leaderboard</h3>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        The combined ranking still exists, but it now starts by surfacing one best setup from each strategy type.
+                                    </p>
+                                </div>
+                            )}
                             {result.optimization.topRecommendations.map((recommendation) => (
-                                <div key={`${recommendation.rank}-${recommendation.strategyType}`} className="rounded-lg border border-border bg-muted/20 p-4 space-y-3">
+                                <div key={getRecommendationKey(recommendation)} className="rounded-lg border border-border bg-muted/20 p-4 space-y-3">
                                     <div className="flex items-center justify-between gap-3">
                                         <div className="flex items-center gap-2">
                                             <Badge variant={recommendation.rank === 1 ? "secondary" : "outline"}>
                                                 #{recommendation.rank}
                                             </Badge>
-                                            <div className="text-sm font-semibold text-foreground">{recommendation.strategyType}</div>
+                                            <div>
+                                                <div className="text-sm font-semibold text-foreground">{getStrategyTypeLabel(recommendation.strategyType)}</div>
+                                                <div className="text-[11px] text-muted-foreground">{recommendation.strategyType}</div>
+                                            </div>
                                         </div>
                                         <div className="text-xs text-muted-foreground">
                                             score <span className="font-semibold text-foreground">{recommendation.score.toFixed(3)}</span>
@@ -362,9 +462,9 @@ export function StrategyOptimizerPanel() {
                                         <Button
                                             size="sm"
                                             onClick={() => applyRecommendation(recommendation)}
-                                            disabled={applyingRank === recommendation.rank}
+                                            disabled={applyingKey === getRecommendationKey(recommendation)}
                                         >
-                                            {applyingRank === recommendation.rank ? (
+                                            {applyingKey === getRecommendationKey(recommendation) ? (
                                                 <Loader2 className="w-4 h-4 animate-spin" />
                                             ) : (
                                                 <WandSparkles className="w-4 h-4" />

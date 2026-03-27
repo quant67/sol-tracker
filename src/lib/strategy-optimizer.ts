@@ -338,6 +338,13 @@ function sortCandidates(left: CandidateScore, right: CandidateScore): number {
         || right.metrics.avgMaxReturnPct - left.metrics.avgMaxReturnPct;
 }
 
+function getTopCandidateByType(
+    candidates: CandidateScore[],
+    strategyType: StrategyType
+): CandidateScore | null {
+    return candidates.find((candidate) => candidate.strategyType === strategyType) || null;
+}
+
 export function optimizeSwingStrategies(request: OptimizationRequest): OptimizationResult {
     const candidates = [
         ...buildEntryLongCandidates(request.mint, request.watchTokenId, request.style, request.interval),
@@ -348,15 +355,22 @@ export function optimizeSwingStrategies(request: OptimizationRequest): Optimizat
     const scored = candidates.map((candidate) => evaluateCandidate(candidate, request.mint, request.series.points));
     const sorted = [...scored].sort(sortCandidates);
     const viable = sorted.filter((candidate) => candidate.metrics.resolvedSignals >= 4);
+    const bestEntryLong = getTopCandidateByType(viable, 'entry_long');
+    const bestEntryRebound = getTopCandidateByType(viable, 'entry_rebound');
+    const bestPullbackToMa = getTopCandidateByType(viable, 'pullback_to_ma');
+    const featured = [bestEntryLong, bestEntryRebound, bestPullbackToMa]
+        .filter((candidate): candidate is CandidateScore => candidate !== null)
+        .sort(sortCandidates);
+    const featuredSet = new Set(featured);
 
-    const topRecommendations = viable
+    const topRecommendations = [...featured, ...viable.filter((candidate) => !featuredSet.has(candidate))]
         .slice(0, 6)
         .map((candidate, index) => toRecommendation(candidate, index, request.style));
 
     const topByType = {
-        entry_long: viable.filter((candidate) => candidate.strategyType === 'entry_long').slice(0, 1).map((candidate) => toRecommendation(candidate, 0, request.style))[0] || null,
-        entry_rebound: viable.filter((candidate) => candidate.strategyType === 'entry_rebound').slice(0, 1).map((candidate) => toRecommendation(candidate, 0, request.style))[0] || null,
-        pullback_to_ma: viable.filter((candidate) => candidate.strategyType === 'pullback_to_ma').slice(0, 1).map((candidate) => toRecommendation(candidate, 0, request.style))[0] || null,
+        entry_long: bestEntryLong ? toRecommendation(bestEntryLong, 0, request.style) : null,
+        entry_rebound: bestEntryRebound ? toRecommendation(bestEntryRebound, 0, request.style) : null,
+        pullback_to_ma: bestPullbackToMa ? toRecommendation(bestPullbackToMa, 0, request.style) : null,
     };
 
     return {
@@ -373,7 +387,7 @@ export function optimizeSwingStrategies(request: OptimizationRequest): Optimizat
         pointsUsed: request.series.points.length,
         firstPointAt: new Date(request.series.points[0]?.capturedAtMs ?? 0).toISOString(),
         lastPointAt: new Date(request.series.points.at(-1)?.capturedAtMs ?? 0).toISOString(),
-        bestOverall: topRecommendations[0] || null,
+        bestOverall: viable[0] ? toRecommendation(viable[0], 0, request.style) : null,
         topRecommendations,
         topByType,
     };
