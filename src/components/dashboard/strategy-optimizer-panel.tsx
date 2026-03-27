@@ -85,7 +85,30 @@ interface OptimizationResponse {
     };
 }
 
+interface OptimizationJob {
+    id: string;
+    watch_token_id: string;
+    mint: string;
+    history_days: number;
+    interval: string;
+    style: string;
+    status: "queued" | "running" | "completed" | "failed";
+    progress_message: string | null;
+    provider: string | null;
+    pool_address: string | null;
+    pool_name: string | null;
+    result_json: OptimizationResponse | null;
+    error_message: string | null;
+    attempt_count: number;
+    requested_by: string | null;
+    created_at: string;
+    started_at: string | null;
+    finished_at: string | null;
+    updated_at: string;
+}
+
 const POLL_INTERVAL = 10000;
+const JOB_POLL_INTERVAL = 2500;
 const STRATEGY_TYPE_ORDER = ["entry_long", "entry_rebound", "failed_breakdown", "pullback_to_ma"] as const;
 
 function formatPercent(value: number | null | undefined): string {
@@ -151,6 +174,7 @@ export function StrategyOptimizerPanel() {
     const [errorMessage, setErrorMessage] = useState("");
     const [statusMessage, setStatusMessage] = useState("");
     const [result, setResult] = useState<OptimizationResponse | null>(null);
+    const [activeJob, setActiveJob] = useState<OptimizationJob | null>(null);
 
     const fetchWatchTokens = useCallback(async () => {
         try {
@@ -218,6 +242,44 @@ export function StrategyOptimizerPanel() {
         }
     }, [result]);
 
+    useEffect(() => {
+        if (!activeJob?.id) return;
+        if (activeJob.status === "completed" || activeJob.status === "failed") return;
+
+        const timer = window.setInterval(async () => {
+            try {
+                const response = await fetch(`/api/strategy-optimize/jobs/${activeJob.id}`);
+                if (!response.ok) {
+                    const data = await response.json().catch(() => ({}));
+                    throw new Error(data?.error || "Failed to refresh optimization job");
+                }
+
+                const job = await response.json() as OptimizationJob;
+                setActiveJob(job);
+
+                if (job.status === "completed" && job.result_json) {
+                    setResult(job.result_json);
+                    setStatusMessage(
+                        job.result_json.optimization.topRecommendations.length > 0
+                            ? "Optimization finished. Review the recommendations below."
+                            : "Optimization finished, but no viable strategy was found. Try longer history or a smaller interval."
+                    );
+                    setRunning(false);
+                } else if (job.status === "failed") {
+                    setErrorMessage(job.error_message || "Optimization failed");
+                    setRunning(false);
+                } else {
+                    setStatusMessage(job.progress_message || `Optimization ${job.status}...`);
+                }
+            } catch (error: unknown) {
+                setErrorMessage(error instanceof Error ? error.message : "Unknown error");
+                setRunning(false);
+            }
+        }, JOB_POLL_INTERVAL);
+
+        return () => window.clearInterval(timer);
+    }, [activeJob]);
+
     const runOptimization = async () => {
         if (!selectedWatchTokenId) {
             setErrorMessage("Please select a watch token first.");
@@ -233,9 +295,11 @@ export function StrategyOptimizerPanel() {
         setRunning(true);
         setErrorMessage("");
         setStatusMessage("");
+        setActiveJob(null);
+        setResult(null);
 
         try {
-            const response = await fetch("/api/strategy-optimize", {
+            const response = await fetch("/api/strategy-optimize/jobs", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -260,16 +324,25 @@ export function StrategyOptimizerPanel() {
                 throw new Error(message);
             }
 
-            const data = await response.json();
-            setResult(data as OptimizationResponse);
-            setStatusMessage(
-                (data as OptimizationResponse).optimization.topRecommendations.length > 0
-                    ? "Optimization finished. Review the recommendations below."
-                    : "Optimization finished, but no viable strategy was found. Try longer history or a smaller interval."
-            );
+            const job = await response.json() as OptimizationJob;
+            setActiveJob(job);
+
+            if (job.status === "completed" && job.result_json) {
+                setResult(job.result_json);
+                setStatusMessage(
+                    job.result_json.optimization.topRecommendations.length > 0
+                        ? "Optimization finished. Review the recommendations below."
+                        : "Optimization finished, but no viable strategy was found. Try longer history or a smaller interval."
+                );
+                setRunning(false);
+            } else if (job.status === "failed") {
+                throw new Error(job.error_message || "Optimization failed");
+            } else {
+                setStatusMessage(job.progress_message || `Optimization ${job.status}...`);
+            }
         } catch (error: unknown) {
             setErrorMessage(error instanceof Error ? error.message : "Unknown error");
-        } finally {
+            setActiveJob(null);
             setRunning(false);
         }
     };
@@ -412,6 +485,21 @@ export function StrategyOptimizerPanel() {
                         Target token: <span className="font-semibold text-foreground">{selectedToken.symbol || selectedToken.name || "TOKEN"}</span>
                         {" · "}
                         <span className="font-mono">{selectedToken.mint}</span>
+                    </div>
+                )}
+
+                {activeJob && (
+                    <div className="rounded-lg border border-border bg-muted/20 p-4 text-xs">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <div className="text-muted-foreground">Optimization Job</div>
+                                <div className="font-semibold text-foreground">{activeJob.id}</div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Badge variant="outline">{activeJob.status}</Badge>
+                                <span className="text-muted-foreground">{activeJob.progress_message || "-"}</span>
+                            </div>
+                        </div>
                     </div>
                 )}
 

@@ -7,6 +7,7 @@
     "build": "next build",
     "bot": "npx tsx scripts/tg-bot.ts",
     "monitor": "npx tsx scripts/price-monitor.ts",
+    "optimize-worker": "npx tsx scripts/strategy-optimizer-worker.ts",
     "start": "next start",
     "lint": "eslint"
   },

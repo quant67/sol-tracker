@@ -1,6 +1,6 @@
 # Strategy Optimizer 工作流
 
-本文描述“发现一个适合波段交易的 token → 加入 watchlist → 自动拉历史数据回测 → 推荐最佳策略参数 → 一键应用”的最小可用流程。
+本文描述“发现一个适合波段交易的 token → 加入 watchlist → 提交异步优化任务 → Worker 拉历史数据回测 → 推荐最佳策略参数 → 一键应用”的最小可用流程。
 
 ## 1. 目标场景
 
@@ -48,9 +48,10 @@
 
 ### 2.2 API
 
-新增优化 API：
+新增优化 job API：
 
-- `POST /api/strategy-optimize`
+- `POST /api/strategy-optimize/jobs`
+- `GET /api/strategy-optimize/jobs/:id`
 
 请求参数：
 
@@ -65,11 +66,10 @@
 
 返回内容包括：
 
-- token 基本信息
-- 历史数据来源与 pool 信息
-- candles 时间范围
-- 最优策略
-- 推荐列表
+- job 基本信息
+- 当前状态（`queued / running / completed / failed`）
+- progress message
+- 完成后的 token 信息与优化结果
 
 ---
 
@@ -325,6 +325,16 @@ node --import tsx /Users/sixseven/dev/ai-coding/sol-tracker/backtest-optimize.ts
 - 不自动定时重优化
 - 不做多 provider 自动切换
 - 文件缓存写失败时自动降级为“仅本次内存执行”，不会因为部署环境只读而直接让优化失败
+
+### 6.1 异步任务化
+
+当前优化器已经从“同步 HTTP 直接计算”升级为：
+
+- Web API 负责创建 optimization job
+- `sol-tracker-optimizer-worker` 负责顺序执行任务
+- Dashboard 轮询 job 状态并展示结果
+
+这样可以避免优化任务长时间占用主 Web 进程，拖慢 `stats / logs / watch-tokens` 等普通接口。
 
 也就是说：
 

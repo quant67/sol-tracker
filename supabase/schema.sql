@@ -101,12 +101,39 @@ CREATE INDEX IF NOT EXISTS idx_price_strategies_active ON price_strategies(is_ac
 CREATE INDEX IF NOT EXISTS idx_price_snapshots_token_time ON price_snapshots(watch_token_id, captured_at DESC);
 CREATE INDEX IF NOT EXISTS idx_price_alert_events_strategy_time ON price_alert_events(strategy_id, triggered_at DESC);
 
+CREATE TABLE IF NOT EXISTS strategy_optimization_jobs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  watch_token_id UUID REFERENCES watch_tokens(id) ON DELETE CASCADE NOT NULL,
+  mint TEXT NOT NULL,
+  history_days INTEGER NOT NULL,
+  interval TEXT NOT NULL,
+  style TEXT NOT NULL,
+  status TEXT DEFAULT 'queued' NOT NULL,
+  progress_message TEXT,
+  provider TEXT,
+  pool_address TEXT,
+  pool_name TEXT,
+  result_json JSONB,
+  error_message TEXT,
+  attempt_count INTEGER DEFAULT 0 NOT NULL,
+  requested_by TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  started_at TIMESTAMP WITH TIME ZONE,
+  finished_at TIMESTAMP WITH TIME ZONE,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_strategy_optimization_jobs_status_created ON strategy_optimization_jobs(status, created_at ASC);
+CREATE INDEX IF NOT EXISTS idx_strategy_optimization_jobs_token_created ON strategy_optimization_jobs(watch_token_id, created_at DESC);
+
 ALTER TABLE watch_tokens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE price_strategies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE price_snapshots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE price_alert_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE strategy_optimization_jobs ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow all access to watch_tokens" ON watch_tokens FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all access to price_strategies" ON price_strategies FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all access to price_snapshots" ON price_snapshots FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all access to price_alert_events" ON price_alert_events FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all access to strategy_optimization_jobs" ON strategy_optimization_jobs FOR ALL USING (true) WITH CHECK (true);

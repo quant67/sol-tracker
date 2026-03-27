@@ -50,6 +50,22 @@ module.exports = {
             error_file: '/opt/sol-tracker/logs/monitor-error.log',
             out_file: '/opt/sol-tracker/logs/monitor-out.log',
             merge_logs: true,
+        },
+        {
+            name: 'sol-tracker-optimizer-worker',
+            script: 'npm',
+            args: 'run optimize-worker',
+            cwd: '/opt/sol-tracker',
+            env: {
+                NODE_ENV: 'production',
+            },
+            exec_mode: 'fork',
+            autorestart: true,
+            watch: false,
+            log_date_format: 'YYYY-MM-DD HH:mm:ss',
+            error_file: '/opt/sol-tracker/logs/optimizer-worker-error.log',
+            out_file: '/opt/sol-tracker/logs/optimizer-worker-out.log',
+            merge_logs: true,
         }
     ],
 };

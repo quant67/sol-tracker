@@ -32,7 +32,9 @@ sol-tracker/
 │   │   │   ├── logs/route.ts         # 交易日志 API
 │   │   │   ├── price-alerts/route.ts # 价格告警历史 API
 │   │   │   ├── price-backtest/route.ts # 信号回测 API
-│   │   │   ├── strategy-optimize/route.ts # 策略优化推荐 API
+│   │   │   ├── strategy-optimize/route.ts # 策略优化推荐 API（同步调试入口）
+│   │   │   ├── strategy-optimize/jobs/route.ts # 异步优化任务 API
+│   │   │   ├── strategy-optimize/jobs/[id]/route.ts # 异步优化单任务查询 API
 │   │   │   ├── price-strategies/route.ts # 价格策略 CRUD API
 │   │   │   ├── people/route.ts       # 人员 CRUD API
 │   │   │   ├── stats/route.ts        # 统计数据 API
@@ -61,6 +63,7 @@ sol-tracker/
 │   │   ├── helius-sync.ts            # Helius Webhook 同步逻辑
 │   │   ├── solana-parser.ts          # ⭐ 交易解析核心
 │   │   ├── strategy-engine.ts        # 价格行为策略判定核心
+│   │   ├── strategy-optimizer-jobs.ts # 异步优化任务共享类型
 │   │   ├── strategy-optimizer.ts     # 参数搜索、分段验证与推荐评分
 │   │   ├── telegram.ts              # Telegram 推送 + 消息格式化
 │   │   ├── token-resolver.ts         # Token 信息解析（名称/市值）
@@ -72,6 +75,7 @@ sol-tracker/
 │   ├── sync-helius.js                # 手动同步地址到 Helius
 │   ├── check-helius.js               # Helius 状态检查
 │   ├── price-monitor.ts              # 价格监控轮询进程
+│   ├── strategy-optimizer-worker.ts  # 异步优化任务 Worker
 │   └── tg-bot.ts                     # ⭐ 独立运行的 Telegram Bot
 ├── supabase/
 │   ├── schema.sql                    # 完整数据库 Schema
@@ -121,6 +125,7 @@ graph TB
         DB_STRAT["price_strategies 表"]
         DB_SNAP["price_snapshots 表"]
         DB_ALERT["price_alert_events 表"]
+        DB_OPT["strategy_optimization_jobs 表"]
     end
 
     subgraph External["外部服务"]
@@ -231,12 +236,14 @@ sequenceDiagram
    - 命中后先做 `cooldown` 去重，再写入 `price_alert_events`
 
 3. **历史优化**
-   - `strategy-optimizer-panel.tsx` 手动发起外部历史研究
+   - `strategy-optimizer-panel.tsx` 提交异步优化 job 并轮询结果
+   - `POST /api/strategy-optimize/jobs` 创建异步优化任务
+   - `strategy-optimizer-worker.ts` 顺序处理优化任务，避免重计算阻塞主 Web 进程
    - `historical-price-provider.ts` 从 GeckoTerminal 拉取主 pool 的 OHLCV，并写入 `.cache/historical-price`
    - `strategy-optimizer.ts` 对 `entry_long` / `entry_rebound` / `failed_breakdown` / `pullback_to_ma` 做参数搜索
    - 搜索空间按 K 线根数定义，再换算成分钟窗口，避免 `15m/1h` 粒度下窗口过短导致零信号
    - 优化评分已升级为“主窗口表现 + 多窗口稳定性 + 训练/验证分段”的综合口径，而不是只看单一 `lookahead`
-   - `POST /api/strategy-optimize` 同时返回每种策略类型的最优参数和综合榜单，前端可单独应用或批量应用到 `price_strategies`
+   - Worker 完成后把结果写回 job 表，前端再展示每种策略类型的最优参数和综合榜单
 
 4. **告警展示**
    - 告警命中后通过 `telegram.ts` 发送消息
@@ -327,7 +334,7 @@ erDiagram
 - `price_snapshots`：价格快照表，用于窗口计算和历史追踪
 - `price_alert_events`：告警历史表，用于 Dashboard 展示和去重
 
-> 新增的策略优化功能当前不写数据库研究表，而是使用外部历史数据 provider + 本地缓存的方式按需计算推荐结果。
+> 新增的策略优化功能当前不单独维护研究结果历史表，而是使用异步 job 表记录执行状态，并结合外部历史数据 provider + 本地缓存按需计算推荐结果。
 
 ---
 
@@ -339,6 +346,7 @@ erDiagram
 - 新增信号回测引擎 `src/lib/backtest-engine.ts`
 - 新增历史数据 provider `src/lib/historical-price-provider.ts`
 - 新增参数优化器 `src/lib/strategy-optimizer.ts`
+- 新增异步优化任务共享类型 `src/lib/strategy-optimizer-jobs.ts`
 - 新增回测设计文档 `docs/backtest_metrics_upgrade.md`
 - 回测引擎升级为支持 `MFE / MAE / End Return / windowMetrics`
 - 新增 Dashboard 页面 `Price Strategy Center` 和 `Price Alert History`
@@ -347,8 +355,13 @@ erDiagram
 - 新增 Telegram Bot 命令：watch token 管理、策略管理、策略测试
 - 新增回测 API `src/app/api/price-backtest/route.ts`
 - 新增优化 API `src/app/api/strategy-optimize/route.ts`
+- 新增异步优化 Worker `scripts/strategy-optimizer-worker.ts`
+- 新增异步优化 API `src/app/api/strategy-optimize/jobs/route.ts`
+- 新增异步优化单任务查询 API `src/app/api/strategy-optimize/jobs/[id]/route.ts`
 - 新增数据库迁移 `supabase/migration-price-monitor.sql`
+- 新增数据库迁移 `supabase/migration-strategy-optimizer-jobs.sql`
 - 新增 PM2 运行项 `sol-tracker-monitor`
+- 新增 PM2 运行项 `sol-tracker-optimizer-worker`
 
 本次更新的核心边界很简单：
 
