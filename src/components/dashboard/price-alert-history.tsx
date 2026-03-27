@@ -58,6 +58,9 @@ function summarizeSnapshot(snapshot: Record<string, unknown>): string {
     if (kind === "pullback_to_ma") {
         return `pullback ${formatPercent(-Number(snapshot.distanceFromHighPct))} · target +${snapshot.targetPct}%`;
     }
+    if (kind === "failed_breakdown") {
+        return `reclaim ${formatPercent(snapshot.reboundPct)} · dd ${formatPercent(-Number(snapshot.drawdownFromHighPct))}`;
+    }
     return "-";
 }
 
@@ -127,7 +130,7 @@ export function PriceAlertHistory() {
                                 const summary = summarizeSnapshot(row.snapshot || {});
                                 const currentPrice = formatPrice(row.snapshot?.currentPrice);
                                 const strategyType = row.strategy_type || "unknown";
-                                const isUp = strategyType.includes("up") || strategyType === "entry_long" || strategyType === "entry_rebound" || strategyType === "pullback_to_ma";
+                                const isUp = strategyType.includes("up") || strategyType === "entry_long" || strategyType === "entry_rebound" || strategyType === "pullback_to_ma" || strategyType === "failed_breakdown";
 
                                 return (
                                     <TableRow key={row.id} className="border-border hover:bg-muted/40 transition-colors">

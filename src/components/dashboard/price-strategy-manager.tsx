@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-type StrategyType = "pct_change_up" | "pct_change_down" | "breakout_up" | "breakout_down" | "entry_long" | "entry_rebound" | "pullback_to_ma";
+type StrategyType = "pct_change_up" | "pct_change_down" | "breakout_up" | "breakout_down" | "entry_long" | "entry_rebound" | "pullback_to_ma" | "failed_breakdown";
 
 interface WatchToken {
     id: string;
@@ -64,6 +64,7 @@ function getStrategyTypeLabel(strategyType: StrategyType): string {
     if (strategyType === "breakout_down") return "Breakout Down";
     if (strategyType === "entry_long") return "Trend Continuation";
     if (strategyType === "entry_rebound") return "Local Rebound";
+    if (strategyType === "failed_breakdown") return "Failed Breakdown";
     return "Pullback To MA";
 }
 
@@ -79,6 +80,9 @@ function getStrategyHint(strategyType: StrategyType): string {
     }
     if (strategyType === "entry_rebound") {
         return "Best for local low rebounds after price regains short-term structure.";
+    }
+    if (strategyType === "failed_breakdown") {
+        return "Experimental bottom signal for deep pullbacks that fail to break down and quickly reclaim structure.";
     }
     return "Best for trend pullbacks that reclaim moving averages and continue higher.";
 }
@@ -109,6 +113,8 @@ export function PriceStrategyManager() {
     const [minReboundPct, setMinReboundPct] = useState("1.5");
     const [maxDistanceFromLowPct, setMaxDistanceFromLowPct] = useState("6");
     const [pullbackTolerancePct, setPullbackTolerancePct] = useState("1.5");
+    const [reclaimPct, setReclaimPct] = useState("1");
+    const [minDrawdownPct, setMinDrawdownPct] = useState("12");
     const [cooldownSec, setCooldownSec] = useState("300");
     const [chatId, setChatId] = useState("");
 
@@ -372,6 +378,37 @@ export function PriceStrategyManager() {
                 targetPct: targetNum,
                 pullbackTolerancePct: pullbackPctNum,
                 minTrendPct: trendPctNum,
+            };
+        } else if (strategyType === "failed_breakdown") {
+            const lookbackNum = Number(lookbackMin || "0");
+            const fastNum = Number(fastWindowMin || "0");
+            const slowNum = Number(slowWindowMin || "0");
+            const targetNum = Number(entryTargetPct || "0");
+            const reclaimNum = Number(reclaimPct || "0");
+            const maxDistanceNum = Number(maxDistanceFromLowPct || "0");
+            const drawdownNum = Number(minDrawdownPct || "0");
+
+            if (
+                !Number.isFinite(lookbackNum) || lookbackNum <= 0 ||
+                !Number.isFinite(fastNum) || fastNum <= 0 ||
+                !Number.isFinite(slowNum) || slowNum <= 0 ||
+                !Number.isFinite(targetNum) || targetNum <= 0 ||
+                !Number.isFinite(reclaimNum) || reclaimNum <= 0 ||
+                !Number.isFinite(maxDistanceNum) || maxDistanceNum <= 0 ||
+                !Number.isFinite(drawdownNum) || drawdownNum < 0
+            ) {
+                setErrorMessage("Failed breakdown parameters must be valid positive numbers.");
+                return;
+            }
+
+            params = {
+                lookbackMin: lookbackNum,
+                fastWindowMin: fastNum,
+                slowWindowMin: slowNum,
+                targetPct: targetNum,
+                reclaimPct: reclaimNum,
+                maxDistanceFromLowPct: maxDistanceNum,
+                minDrawdownPct: drawdownNum,
             };
         } else {
             const target = Number(targetPrice || "0");
@@ -656,6 +693,7 @@ export function PriceStrategyManager() {
                                         <option value="breakout_down">breakout_down</option>
                                         <option value="entry_long">entry_long</option>
                                         <option value="entry_rebound">entry_rebound</option>
+                                        <option value="failed_breakdown">failed_breakdown</option>
                                         <option value="pullback_to_ma">pullback_to_ma</option>
                                     </select>
                                 </div>
@@ -689,7 +727,7 @@ export function PriceStrategyManager() {
                                         <Input value={thresholdPct} onChange={(event) => setThresholdPct(event.target.value)} />
                                     </div>
                                 </div>
-                            ) : (strategyType === "entry_long" || strategyType === "entry_rebound" || strategyType === "pullback_to_ma") ? (
+                            ) : (strategyType === "entry_long" || strategyType === "entry_rebound" || strategyType === "pullback_to_ma" || strategyType === "failed_breakdown") ? (
                                 <div className="space-y-4">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
@@ -720,6 +758,8 @@ export function PriceStrategyManager() {
                                                     ? "Breakout Tolerance (%)"
                                                     : strategyType === "entry_rebound"
                                                         ? "Min Rebound (%)"
+                                                        : strategyType === "failed_breakdown"
+                                                            ? "Reclaim (%)"
                                                         : "Pullback Tolerance (%)"}
                                             </label>
                                             <Input
@@ -727,11 +767,15 @@ export function PriceStrategyManager() {
                                                     ? breakoutTolerancePct
                                                     : strategyType === "entry_rebound"
                                                         ? minReboundPct
+                                                        : strategyType === "failed_breakdown"
+                                                            ? reclaimPct
                                                         : pullbackTolerancePct}
                                                 onChange={(event) => strategyType === "entry_long"
                                                     ? setBreakoutTolerancePct(event.target.value)
                                                     : strategyType === "entry_rebound"
                                                         ? setMinReboundPct(event.target.value)
+                                                        : strategyType === "failed_breakdown"
+                                                            ? setReclaimPct(event.target.value)
                                                         : setPullbackTolerancePct(event.target.value)}
                                             />
                                         </div>
@@ -741,6 +785,8 @@ export function PriceStrategyManager() {
                                                     ? "Min Trend (%)"
                                                     : strategyType === "entry_rebound"
                                                         ? "Max Distance From Low (%)"
+                                                        : strategyType === "failed_breakdown"
+                                                            ? "Max Distance From Low (%)"
                                                         : "Min Trend (%)"}
                                             </label>
                                             <Input
@@ -748,15 +794,31 @@ export function PriceStrategyManager() {
                                                     ? minTrendPct
                                                     : strategyType === "entry_rebound"
                                                         ? maxDistanceFromLowPct
+                                                        : strategyType === "failed_breakdown"
+                                                            ? maxDistanceFromLowPct
                                                         : minTrendPct}
                                                 onChange={(event) => strategyType === "entry_long"
                                                     ? setMinTrendPct(event.target.value)
                                                     : strategyType === "entry_rebound"
                                                         ? setMaxDistanceFromLowPct(event.target.value)
+                                                        : strategyType === "failed_breakdown"
+                                                            ? setMaxDistanceFromLowPct(event.target.value)
                                                         : setMinTrendPct(event.target.value)}
                                             />
                                         </div>
                                     </div>
+
+                                    {strategyType === "failed_breakdown" && (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-[11px] text-muted-foreground block mb-1">Min Drawdown (%)</label>
+                                                <Input value={minDrawdownPct} onChange={(event) => setMinDrawdownPct(event.target.value)} />
+                                            </div>
+                                            <div className="rounded-xl border border-dashed border-border/70 px-3 py-2 text-[11px] text-muted-foreground">
+                                                Experimental bottom model: previous sample must sit near the local low, then current price reclaims above fast MA.
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             ) : (
                                 <div>

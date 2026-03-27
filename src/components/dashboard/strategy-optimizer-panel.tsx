@@ -60,7 +60,7 @@ interface OptimizationResponse {
 }
 
 const POLL_INTERVAL = 10000;
-const STRATEGY_TYPE_ORDER = ["entry_long", "entry_rebound", "pullback_to_ma"] as const;
+const STRATEGY_TYPE_ORDER = ["entry_long", "entry_rebound", "failed_breakdown", "pullback_to_ma"] as const;
 
 function formatPercent(value: number | null | undefined): string {
     if (value === null || value === undefined || !Number.isFinite(value)) return "-";
@@ -71,6 +71,7 @@ function formatPercent(value: number | null | undefined): string {
 function getStrategyTypeLabel(strategyType: string): string {
     if (strategyType === "entry_long") return "Trend Continuation";
     if (strategyType === "entry_rebound") return "Local Rebound";
+    if (strategyType === "failed_breakdown") return "Failed Breakdown";
     if (strategyType === "pullback_to_ma") return "Pullback To MA";
     return strategyType;
 }
@@ -382,7 +383,7 @@ export function StrategyOptimizerPanel() {
                                     <div>
                                         <h3 className="text-sm font-semibold text-foreground">Best By Strategy Type</h3>
                                         <p className="text-xs text-muted-foreground mt-1">
-                                            Each strategy family keeps one independent best setup so you can compare continuation, rebound and pullback styles side by side.
+                                            Each strategy family keeps one independent best setup so you can compare continuation, rebound, bottom-reclaim and pullback styles side by side.
                                         </p>
                                     </div>
                                     <div className="flex justify-end">
@@ -396,7 +397,7 @@ export function StrategyOptimizerPanel() {
                                             Apply All Featured
                                         </Button>
                                     </div>
-                                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
+                                    <div className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-4 gap-3">
                                         {featuredRecommendations.map((recommendation) => {
                                             const recommendationKey = getRecommendationKey(recommendation);
                                             return (
@@ -406,7 +407,12 @@ export function StrategyOptimizerPanel() {
                                                             <div className="text-sm font-semibold text-foreground">{getStrategyTypeLabel(recommendation.strategyType)}</div>
                                                             <div className="text-[11px] text-muted-foreground">{recommendation.strategyType}</div>
                                                         </div>
-                                                        <Badge variant="secondary">score {recommendation.score.toFixed(3)}</Badge>
+                                                        <div className="flex items-center gap-2">
+                                                            {recommendation.metrics.resolvedSignals < 4 && (
+                                                                <Badge variant="outline">low sample</Badge>
+                                                            )}
+                                                            <Badge variant="secondary">score {recommendation.score.toFixed(3)}</Badge>
+                                                        </div>
                                                     </div>
 
                                                     <div className="grid grid-cols-2 gap-3 text-xs">

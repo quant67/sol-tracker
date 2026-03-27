@@ -120,16 +120,18 @@
 
 ### 4.1 当前候选策略
 
-优化器会在这三类 entry 型策略里搜索：
+优化器会在这四类 entry / swing 型策略里搜索：
 
 - `entry_long`
 - `entry_rebound`
+- `failed_breakdown`
 - `pullback_to_ma`
 
 这三类分别对应：
 
 - **延续突破**
 - **低点反弹**
+- **假跌破收复（实验）**
 - **趋势回踩中继**
 
 当前展示方式分成两层：

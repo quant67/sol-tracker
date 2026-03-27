@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { normalizeStrategy } from '@/lib/strategy-engine';
-import { runEntryStrategyBacktest } from '@/lib/backtest-engine';
+import { getDefaultBacktestWindows, runEntryStrategyBacktest } from '@/lib/backtest-engine';
 
 function extractRelation<T>(value: T | T[] | null | undefined): T | null {
     if (!value) return null;
@@ -15,6 +15,9 @@ export async function POST(req: NextRequest) {
         const strategyId = body?.strategy_id ? String(body.strategy_id) : '';
         const lookaheadMin = Number(body?.lookahead_min ?? 120);
         const historyDays = Number(body?.history_days ?? 30);
+        const requestedWindowMinutes = Array.isArray(body?.window_minutes)
+            ? body.window_minutes.map((value: unknown) => Number(value)).filter((value: number) => Number.isFinite(value) && value > 0)
+            : [];
 
         if (!strategyId) {
             return NextResponse.json({ error: 'strategy_id is required' }, { status: 400 });
@@ -43,8 +46,8 @@ export async function POST(req: NextRequest) {
         if (!strategy) {
             return NextResponse.json({ error: 'invalid strategy config' }, { status: 400 });
         }
-        if (strategy.type !== 'entry_long' && strategy.type !== 'entry_rebound' && strategy.type !== 'pullback_to_ma') {
-            return NextResponse.json({ error: 'backtest currently supports entry_long, entry_rebound and pullback_to_ma only' }, { status: 400 });
+        if (strategy.type !== 'entry_long' && strategy.type !== 'entry_rebound' && strategy.type !== 'pullback_to_ma' && strategy.type !== 'failed_breakdown') {
+            return NextResponse.json({ error: 'backtest currently supports entry_long, entry_rebound, pullback_to_ma and failed_breakdown only' }, { status: 400 });
         }
 
         const token = extractRelation<{ mint?: string; symbol?: string }>(rawStrategy.watch_tokens);
@@ -80,7 +83,10 @@ export async function POST(req: NextRequest) {
             },
             tokenMint,
             series,
-            lookaheadMin
+            lookaheadMin,
+            requestedWindowMinutes.length > 0
+                ? requestedWindowMinutes
+                : getDefaultBacktestWindows(strategy.type, lookaheadMin)
         );
 
         return NextResponse.json({

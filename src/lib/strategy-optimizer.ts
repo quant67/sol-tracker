@@ -47,7 +47,7 @@ export interface OptimizationResult {
     lastPointAt: string;
     bestOverall: StrategyRecommendation | null;
     topRecommendations: StrategyRecommendation[];
-    topByType: Record<'entry_long' | 'entry_rebound' | 'pullback_to_ma', StrategyRecommendation | null>;
+    topByType: Record<'entry_long' | 'entry_rebound' | 'pullback_to_ma' | 'failed_breakdown', StrategyRecommendation | null>;
 }
 
 type CandidateDefinition = {
@@ -285,6 +285,54 @@ function buildPullbackCandidates(
     return candidates;
 }
 
+function buildFailedBreakdownCandidates(
+    mint: string,
+    watchTokenId: string,
+    style: OptimizationStyle,
+    interval: HistoricalInterval
+): CandidateDefinition[] {
+    const targets = style === 'aggressive' ? [6, 8] : [8, 10];
+    const reclaimPcts = style === 'conservative' ? [1, 1.5] : [0.75, 1, 1.5];
+    const maxDistances = style === 'conservative' ? [3, 4] : [3, 4, 5];
+    const minDrawdowns = style === 'aggressive' ? [8, 12] : style === 'conservative' ? [15, 20] : [10, 15];
+    const lookaheads = getLookaheads(style, interval);
+    const candidates: CandidateDefinition[] = [];
+
+    for (const combo of getWindowCombos(style, interval)) {
+        for (const targetPct of targets) {
+            for (const reclaimPct of reclaimPcts) {
+                for (const maxDistanceFromLowPct of maxDistances) {
+                    if (maxDistanceFromLowPct <= reclaimPct) continue;
+                    for (const minDrawdownPct of minDrawdowns) {
+                        for (const lookaheadMin of lookaheads) {
+                            candidates.push({
+                                lookaheadMin,
+                                strategy: {
+                                    id: `failed_breakdown-${mint}-${combo.lookbackMin}-${combo.fastWindowMin}-${combo.slowWindowMin}-${targetPct}-${reclaimPct}-${maxDistanceFromLowPct}-${minDrawdownPct}-${lookaheadMin}`,
+                                    watchTokenId,
+                                    name: 'optimized failed_breakdown',
+                                    type: 'failed_breakdown',
+                                    params: {
+                                        ...combo,
+                                        targetPct,
+                                        reclaimPct,
+                                        maxDistanceFromLowPct,
+                                        minDrawdownPct,
+                                    },
+                                    cooldownSec: 300,
+                                    chatId: null,
+                                },
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return candidates;
+}
+
 function splitSeries(points: HistoricalPricePoint[]): { train: HistoricalPricePoint[]; validation: HistoricalPricePoint[] } {
     const splitIndex = Math.max(Math.floor(points.length * 0.7), 20);
     return {
@@ -350,15 +398,17 @@ export function optimizeSwingStrategies(request: OptimizationRequest): Optimizat
         ...buildEntryLongCandidates(request.mint, request.watchTokenId, request.style, request.interval),
         ...buildEntryReboundCandidates(request.mint, request.watchTokenId, request.style, request.interval),
         ...buildPullbackCandidates(request.mint, request.watchTokenId, request.style, request.interval),
+        ...buildFailedBreakdownCandidates(request.mint, request.watchTokenId, request.style, request.interval),
     ];
 
     const scored = candidates.map((candidate) => evaluateCandidate(candidate, request.mint, request.series.points));
     const sorted = [...scored].sort(sortCandidates);
     const viable = sorted.filter((candidate) => candidate.metrics.resolvedSignals >= 4);
-    const bestEntryLong = getTopCandidateByType(viable, 'entry_long');
-    const bestEntryRebound = getTopCandidateByType(viable, 'entry_rebound');
-    const bestPullbackToMa = getTopCandidateByType(viable, 'pullback_to_ma');
-    const featured = [bestEntryLong, bestEntryRebound, bestPullbackToMa]
+    const bestEntryLong = getTopCandidateByType(sorted, 'entry_long');
+    const bestEntryRebound = getTopCandidateByType(sorted, 'entry_rebound');
+    const bestPullbackToMa = getTopCandidateByType(sorted, 'pullback_to_ma');
+    const bestFailedBreakdown = getTopCandidateByType(sorted, 'failed_breakdown');
+    const featured = [bestEntryLong, bestEntryRebound, bestPullbackToMa, bestFailedBreakdown]
         .filter((candidate): candidate is CandidateScore => candidate !== null)
         .sort(sortCandidates);
     const featuredSet = new Set(featured);
@@ -371,6 +421,7 @@ export function optimizeSwingStrategies(request: OptimizationRequest): Optimizat
         entry_long: bestEntryLong ? toRecommendation(bestEntryLong, 0, request.style) : null,
         entry_rebound: bestEntryRebound ? toRecommendation(bestEntryRebound, 0, request.style) : null,
         pullback_to_ma: bestPullbackToMa ? toRecommendation(bestPullbackToMa, 0, request.style) : null,
+        failed_breakdown: bestFailedBreakdown ? toRecommendation(bestFailedBreakdown, 0, request.style) : null,
     };
 
     return {

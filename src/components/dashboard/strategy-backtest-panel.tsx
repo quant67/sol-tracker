@@ -20,8 +20,26 @@ interface BacktestSample {
     targetPrice: number;
     maxFuturePrice: number;
     maxFutureReturnPct: number;
+    mfePrice: number;
+    mfePct: number;
+    maePrice: number;
+    maePct: number;
+    endPrice: number;
+    endReturnPct: number;
     hit: boolean;
     minutesToHit: number | null;
+}
+
+interface BacktestWindowMetric {
+    lookaheadMin: number;
+    resolvedSignals: number;
+    skippedSignals: number;
+    hits: number;
+    hitRate: number;
+    avgMfePct: number;
+    avgMaePct: number;
+    avgEndReturnPct: number;
+    avgMinutesToHit: number | null;
 }
 
 interface BacktestSummary {
@@ -38,7 +56,11 @@ interface BacktestSummary {
     hits: number;
     hitRate: number;
     avgMaxReturnPct: number;
+    avgMfePct: number;
+    avgMaePct: number;
+    avgEndReturnPct: number;
     avgMinutesToHit: number | null;
+    windowMetrics: BacktestWindowMetric[];
     samples: BacktestSample[];
 }
 
@@ -87,7 +109,7 @@ export function StrategyBacktestPanel() {
             const data = await res.json();
             const list = Array.isArray(data)
                 ? data.filter((s: StrategyOption) =>
-                    s.type === "entry_long" || s.type === "entry_rebound" || s.type === "pullback_to_ma")
+                    s.type === "entry_long" || s.type === "entry_rebound" || s.type === "pullback_to_ma" || s.type === "failed_breakdown")
                 : [];
             setStrategies(list);
             if (!selectedStrategyId && list.length > 0) {
@@ -159,7 +181,7 @@ export function StrategyBacktestPanel() {
                     <div>
                         <h2 className="text-lg font-semibold text-foreground">Signal Backtest</h2>
                         <p className="text-xs text-muted-foreground mt-1">
-                            Validate whether continuation and rebound entry setups tend to follow through.
+                            Validate how fast a signal works, how deep it pulls back, and how results change across multiple windows.
                         </p>
                     </div>
                 </div>
@@ -233,12 +255,12 @@ export function StrategyBacktestPanel() {
                                 <div className="text-xl font-semibold text-cyan-300">{formatPercent(result.hitRate)}</div>
                             </div>
                             <div className="rounded-lg border border-border bg-muted/20 p-3">
-                                <div className="text-[11px] text-muted-foreground">Avg Max Return</div>
-                                <div className="text-xl font-semibold text-foreground">{formatPercent(result.avgMaxReturnPct)}</div>
+                                <div className="text-[11px] text-muted-foreground">Avg MFE</div>
+                                <div className="text-xl font-semibold text-foreground">{formatPercent(result.avgMfePct)}</div>
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                             <div className="rounded-lg border border-border bg-muted/20 p-3">
                                 <div className="text-[11px] text-muted-foreground">Avg Minutes to Target</div>
                                 <div className="text-base font-semibold text-foreground">
@@ -250,8 +272,57 @@ export function StrategyBacktestPanel() {
                                 <div className="text-base font-semibold text-foreground">{result.lookaheadMin} min</div>
                             </div>
                             <div className="rounded-lg border border-border bg-muted/20 p-3">
+                                <div className="text-[11px] text-muted-foreground">Avg MAE</div>
+                                <div className="text-base font-semibold text-rose-300">{formatPercent(result.avgMaePct)}</div>
+                            </div>
+                            <div className="rounded-lg border border-border bg-muted/20 p-3">
+                                <div className="text-[11px] text-muted-foreground">Avg End Return</div>
+                                <div className="text-base font-semibold text-foreground">{formatPercent(result.avgEndReturnPct)}</div>
+                            </div>
+                            <div className="rounded-lg border border-border bg-muted/20 p-3 md:col-span-1">
                                 <div className="text-[11px] text-muted-foreground">Snapshots Used</div>
                                 <div className="text-base font-semibold text-foreground">{result.snapshotsUsed}</div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div className="flex items-center justify-between gap-2 mb-2">
+                                <div className="text-sm font-semibold text-foreground">Window Profile</div>
+                                <div className="text-[11px] text-muted-foreground">
+                                    Compare hit rate and excursion metrics across multiple lookahead windows.
+                                </div>
+                            </div>
+                            <div className="overflow-x-auto rounded-lg border border-border bg-muted/20">
+                                <table className="w-full min-w-[720px] text-xs">
+                                    <thead className="bg-background/60 text-muted-foreground">
+                                        <tr>
+                                            <th className="px-3 py-2 text-left font-medium">Window</th>
+                                            <th className="px-3 py-2 text-left font-medium">Resolved</th>
+                                            <th className="px-3 py-2 text-left font-medium">Hits</th>
+                                            <th className="px-3 py-2 text-left font-medium">Hit Rate</th>
+                                            <th className="px-3 py-2 text-left font-medium">Avg MFE</th>
+                                            <th className="px-3 py-2 text-left font-medium">Avg MAE</th>
+                                            <th className="px-3 py-2 text-left font-medium">Avg End</th>
+                                            <th className="px-3 py-2 text-left font-medium">Avg Minutes</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {result.windowMetrics.map((metric) => (
+                                            <tr key={metric.lookaheadMin} className="border-t border-border/70">
+                                                <td className="px-3 py-2 font-semibold text-foreground">{metric.lookaheadMin}m</td>
+                                                <td className="px-3 py-2 text-foreground">{metric.resolvedSignals}</td>
+                                                <td className="px-3 py-2 text-foreground">{metric.hits}</td>
+                                                <td className="px-3 py-2 text-cyan-300">{formatPercent(metric.hitRate)}</td>
+                                                <td className="px-3 py-2 text-foreground">{formatPercent(metric.avgMfePct)}</td>
+                                                <td className="px-3 py-2 text-rose-300">{formatPercent(metric.avgMaePct)}</td>
+                                                <td className="px-3 py-2 text-foreground">{formatPercent(metric.avgEndReturnPct)}</td>
+                                                <td className="px-3 py-2 text-foreground">
+                                                    {metric.avgMinutesToHit === null ? "-" : `${metric.avgMinutesToHit.toFixed(2)}m`}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
 
@@ -267,8 +338,10 @@ export function StrategyBacktestPanel() {
                                         <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
                                             <div>Entry: <span className="font-mono text-foreground">{formatPrice(sample.entryPrice)}</span></div>
                                             <div>Target: <span className="font-mono text-foreground">{formatPrice(sample.targetPrice)}</span></div>
-                                            <div>Max: <span className="font-mono text-foreground">{formatPrice(sample.maxFuturePrice)}</span></div>
-                                            <div>Return: <span className="font-mono text-foreground">{formatPercent(sample.maxFutureReturnPct)}</span></div>
+                                            <div>MFE: <span className="font-mono text-foreground">{formatPercent(sample.mfePct)}</span></div>
+                                            <div>MAE: <span className="font-mono text-rose-300">{formatPercent(sample.maePct)}</span></div>
+                                            <div>End: <span className="font-mono text-foreground">{formatPercent(sample.endReturnPct)}</span></div>
+                                            <div>Exit Px: <span className="font-mono text-foreground">{formatPrice(sample.endPrice)}</span></div>
                                         </div>
                                         <div className="mt-1 text-xs text-muted-foreground">
                                             {sample.hit

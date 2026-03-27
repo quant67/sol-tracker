@@ -19,6 +19,10 @@ Sol-Tracker (Sol Sniper) 是一个 **Solana 链上钱包监控工具**，核心�
 ``` 
 sol-tracker/
 ├── backtest-optimize.ts             # 本地命令行历史优化 / smoke test 脚本
+├── docs/
+│   ├── backtest_metrics_upgrade.md  # 回测指标升级设计
+│   ├── bottom_signal_research.md    # 底部信号研究设计
+│   └── ...
 ├── src/
 │   ├── app/
 │   │   ├── api/
@@ -52,7 +56,7 @@ sol-tracker/
 │   ├── lib/
 │   │   ├── auth.ts                   # 🔒 Token 签发/验证
 │   │   ├── supabase.ts               # Supabase 客户端（仅服务端）
-│   │   ├── backtest-engine.ts        # 信号历史回测核心
+│   │   ├── backtest-engine.ts        # 信号历史回测核心（hit / MFE / MAE / 多窗口）
 │   │   ├── historical-price-provider.ts # 外部历史价格 provider + 缓存
 │   │   ├── helius-sync.ts            # Helius Webhook 同步逻辑
 │   │   ├── solana-parser.ts          # ⭐ 交易解析核心
@@ -229,7 +233,7 @@ sequenceDiagram
 3. **历史优化**
    - `strategy-optimizer-panel.tsx` 手动发起外部历史研究
    - `historical-price-provider.ts` 从 GeckoTerminal 拉取主 pool 的 OHLCV，并写入 `.cache/historical-price`
-   - `strategy-optimizer.ts` 对 `entry_long` / `entry_rebound` / `pullback_to_ma` 做参数搜索
+   - `strategy-optimizer.ts` 对 `entry_long` / `entry_rebound` / `failed_breakdown` / `pullback_to_ma` 做参数搜索
    - 搜索空间按 K 线根数定义，再换算成分钟窗口，避免 `15m/1h` 粒度下窗口过短导致零信号
    - `POST /api/strategy-optimize` 同时返回每种策略类型的最优参数和综合榜单，前端可单独应用或批量应用到 `price_strategies`
 
@@ -246,7 +250,7 @@ sequenceDiagram
 - [recent-activity.tsx](../src/components/dashboard/recent-activity.tsx) — 5 秒
 - [price-strategy-manager.tsx](../src/components/dashboard/price-strategy-manager.tsx) — 8 秒
 - [strategy-optimizer-panel.tsx](../src/components/dashboard/strategy-optimizer-panel.tsx) — 手动触发外部历史优化
-- [strategy-backtest-panel.tsx](../src/components/dashboard/strategy-backtest-panel.tsx) — 手动触发回测
+- [strategy-backtest-panel.tsx](../src/components/dashboard/strategy-backtest-panel.tsx) — 手动触发回测，展示主窗口与多窗口对比
 - [price-alert-history.tsx](../src/components/dashboard/price-alert-history.tsx) — 8 秒
 
 ### 3.6 登录认证
@@ -334,6 +338,8 @@ erDiagram
 - 新增信号回测引擎 `src/lib/backtest-engine.ts`
 - 新增历史数据 provider `src/lib/historical-price-provider.ts`
 - 新增参数优化器 `src/lib/strategy-optimizer.ts`
+- 新增回测设计文档 `docs/backtest_metrics_upgrade.md`
+- 回测引擎升级为支持 `MFE / MAE / End Return / windowMetrics`
 - 新增 Dashboard 页面 `Price Strategy Center` 和 `Price Alert History`
 - 新增 Dashboard `Strategy Optimizer` 面板
 - 新增 Dashboard `Signal Backtest` 面板

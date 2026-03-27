@@ -102,6 +102,7 @@ function strategyUsageText(): string {
         '/strategyadd <mint> breakout_down <targetPrice> [cooldownSec]',
         '/strategyadd <mint> entry_long <lookbackMin> <fastWindowMin> <slowWindowMin> <targetPct> [cooldownSec] [breakoutTolerancePct] [minTrendPct]',
         '/strategyadd <mint> entry_rebound <lookbackMin> <fastWindowMin> <slowWindowMin> <targetPct> [cooldownSec] [minReboundPct] [maxDistanceFromLowPct]',
+        '/strategyadd <mint> failed_breakdown <lookbackMin> <fastWindowMin> <slowWindowMin> <targetPct> [cooldownSec] [reclaimPct] [maxDistanceFromLowPct] [minDrawdownPct]',
         '/strategyadd <mint> pullback_to_ma <lookbackMin> <fastWindowMin> <slowWindowMin> <targetPct> [cooldownSec] [pullbackTolerancePct] [minTrendPct]',
         '',
         'Examples:',
@@ -109,6 +110,7 @@ function strategyUsageText(): string {
         '/strategyadd 7vfCXT... breakout_down 0.00025 600',
         '/strategyadd 7vfCXT... entry_long 30 5 15 10 300 1.5 2',
         '/strategyadd 7vfCXT... entry_rebound 30 5 15 8 300 1.5 6',
+        '/strategyadd 7vfCXT... failed_breakdown 45 5 20 8 300 1 4 12',
         '/strategyadd 7vfCXT... pullback_to_ma 45 5 20 8 300 1.5 3',
     ].join('\n');
 }
@@ -193,6 +195,31 @@ function buildStrategyPayload(
                 targetPct,
                 pullbackTolerancePct: pullbackTolerancePct ?? 1.5,
                 minTrendPct: minTrendPct ?? 3,
+            },
+            cooldownSec: cooldownSec ? Math.floor(cooldownSec) : 300,
+        };
+    }
+
+    if (strategyType === 'failed_breakdown') {
+        if (parts.length < 7) return null;
+        const lookbackMin = parsePositiveNumber(parts[3]);
+        const fastWindowMin = parsePositiveNumber(parts[4]);
+        const slowWindowMin = parsePositiveNumber(parts[5]);
+        const targetPct = parsePositiveNumber(parts[6]);
+        if (!lookbackMin || !fastWindowMin || !slowWindowMin || !targetPct) return null;
+        const cooldownSec = parts[7] ? parsePositiveNumber(parts[7]) : 300;
+        const reclaimPct = parts[8] ? parsePositiveNumber(parts[8]) : 1;
+        const maxDistanceFromLowPct = parts[9] ? parsePositiveNumber(parts[9]) : 4;
+        const minDrawdownPct = parts[10] ? parsePositiveNumber(parts[10]) : 12;
+        return {
+            params: {
+                lookbackMin,
+                fastWindowMin,
+                slowWindowMin,
+                targetPct,
+                reclaimPct: reclaimPct ?? 1,
+                maxDistanceFromLowPct: maxDistanceFromLowPct ?? 4,
+                minDrawdownPct: minDrawdownPct ?? 12,
             },
             cooldownSec: cooldownSec ? Math.floor(cooldownSec) : 300,
         };

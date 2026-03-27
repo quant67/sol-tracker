@@ -1,4 +1,4 @@
-export type StrategyType = 'pct_change_up' | 'pct_change_down' | 'breakout_up' | 'breakout_down' | 'entry_long' | 'entry_rebound' | 'pullback_to_ma';
+export type StrategyType = 'pct_change_up' | 'pct_change_down' | 'breakout_up' | 'breakout_down' | 'entry_long' | 'entry_rebound' | 'pullback_to_ma' | 'failed_breakdown';
 
 export interface StrategyDefinition {
     id: string;
@@ -43,7 +43,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function parseStrategyType(value: unknown): StrategyType | null {
-    if (value === 'pct_change_up' || value === 'pct_change_down' || value === 'breakout_up' || value === 'breakout_down' || value === 'entry_long' || value === 'entry_rebound' || value === 'pullback_to_ma') {
+    if (value === 'pct_change_up' || value === 'pct_change_down' || value === 'breakout_up' || value === 'breakout_down' || value === 'entry_long' || value === 'entry_rebound' || value === 'pullback_to_ma' || value === 'failed_breakdown') {
         return value;
     }
     return null;
@@ -138,6 +138,18 @@ function getMaxDistanceFromLowPct(params: Record<string, unknown>): number | nul
     return pct;
 }
 
+function getReclaimPct(params: Record<string, unknown>): number | null {
+    const pct = toFiniteNumber(params.reclaimPct ?? params.reclaimThresholdPct ?? params.recoveryPct ?? params.confirmPct);
+    if (pct === null || pct <= 0) return null;
+    return pct;
+}
+
+function getMinDrawdownPct(params: Record<string, unknown>): number | null {
+    const pct = toFiniteNumber(params.minDrawdownPct ?? params.drawdownPct ?? params.minOffHighPct ?? params.minPullbackPct);
+    if (pct === null || pct < 0) return null;
+    return pct;
+}
+
 function getEntrySignalContext(
     params: Record<string, unknown>,
     history: PricePoint[],
@@ -183,7 +195,7 @@ export function getMaxWindowMinutes(strategies: StrategyDefinition[]): number {
         let w: number | null = null;
         if (strategy.type === 'pct_change_up' || strategy.type === 'pct_change_down') {
             w = getWindowMinutes(strategy.params);
-        } else if (strategy.type === 'entry_long' || strategy.type === 'entry_rebound' || strategy.type === 'pullback_to_ma') {
+        } else if (strategy.type === 'entry_long' || strategy.type === 'entry_rebound' || strategy.type === 'pullback_to_ma' || strategy.type === 'failed_breakdown') {
             w = getLookbackMinutes(strategy.params);
         }
         if (w && w > max) max = w;
@@ -376,6 +388,57 @@ export function evaluateStrategy(
                     slowWindowMin,
                     pullbackTolerancePct,
                     minTrendPct,
+                    targetPct,
+                }
+            };
+        }
+
+        return { triggered: false };
+    }
+
+    if (strategy.type === 'failed_breakdown') {
+        const context = getEntrySignalContext(strategy.params, history, nowMs);
+        const reclaimPct = getReclaimPct(strategy.params) ?? 1;
+        const maxDistanceFromLowPct = getMaxDistanceFromLowPct(strategy.params) ?? 4;
+        const minDrawdownPct = getMinDrawdownPct(strategy.params) ?? 12;
+        const targetPct = getTargetPct(strategy.params) ?? 8;
+
+        if (!context || previousPrice === null || previousPrice <= 0) return { triggered: false };
+
+        const { lookbackMin, fastWindowMin, slowWindowMin, fastMA, slowMA, recentHigh, recentLow } = context;
+        const reboundPct = ((currentPrice - recentLow) / recentLow) * 100;
+        const drawdownFromHighPct = ((recentHigh - currentPrice) / recentHigh) * 100;
+        const previousDistanceFromLowPct = ((previousPrice - recentLow) / recentLow) * 100;
+        const maSpreadPct = ((fastMA - slowMA) / slowMA) * 100;
+        const drawdownReady = drawdownFromHighPct >= minDrawdownPct;
+        const previousFlushReady = previousDistanceFromLowPct <= reclaimPct;
+        const reclaimReady = reboundPct >= reclaimPct && reboundPct <= maxDistanceFromLowPct;
+        const structureReady = currentPrice >= fastMA && fastMA >= slowMA * 0.99;
+        const reversalReady = currentPrice > previousPrice;
+
+        if (drawdownReady && previousFlushReady && reclaimReady && structureReady && reversalReady) {
+            return {
+                triggered: true,
+                reason: `${strategy.name}: failed breakdown reclaimed from local low, target +${targetPct}%`,
+                dedupeSeed: `failed_breakdown:${lookbackMin}:${fastWindowMin}:${slowWindowMin}:${reclaimPct}:${maxDistanceFromLowPct}:${minDrawdownPct}:${targetPct}`,
+                snapshot: {
+                    kind: 'failed_breakdown',
+                    currentPrice,
+                    previousPrice,
+                    recentHigh,
+                    recentLow,
+                    fastMA: Number(fastMA.toFixed(8)),
+                    slowMA: Number(slowMA.toFixed(8)),
+                    maSpreadPct: Number(maSpreadPct.toFixed(3)),
+                    reboundPct: Number(reboundPct.toFixed(3)),
+                    drawdownFromHighPct: Number(drawdownFromHighPct.toFixed(3)),
+                    previousDistanceFromLowPct: Number(previousDistanceFromLowPct.toFixed(3)),
+                    lookbackMin,
+                    fastWindowMin,
+                    slowWindowMin,
+                    reclaimPct,
+                    maxDistanceFromLowPct,
+                    minDrawdownPct,
                     targetPct,
                 }
             };

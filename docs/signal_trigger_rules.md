@@ -13,7 +13,7 @@
 
 ## 1. 当前支持的信号类型
 
-目前系统支持 7 类价格信号：
+目前系统支持 8 类价格信号：
 
 - `pct_change_up`
 - `pct_change_down`
@@ -21,6 +21,7 @@
 - `breakout_down`
 - `entry_long`
 - `entry_rebound`
+- `failed_breakdown`
 - `pullback_to_ma`
 
 其中：
@@ -29,6 +30,7 @@
 - `breakout_*` 属于“阈值价格穿越触发”
 - `entry_long` 属于“趋势延续 / 接近突破触发”
 - `entry_rebound` 属于“局部低点反弹 / 结构修复触发”
+- `failed_breakdown` 属于“深度回撤后的假跌破收复触发（实验）”
 - `pullback_to_ma` 属于“趋势中的回踩均线再启动触发”
 
 ---
@@ -277,6 +279,141 @@
    `currentPrice >= recentHigh * (1 - breakoutTolerancePct / 100)`
 
    含义：当前价距离近期高点不能太远。
+
+---
+
+## 4.6 `entry_rebound`
+
+### 目标定位
+
+用于识别局部低点反弹后，价格重新站回短期结构的时刻。
+
+### 参数
+
+- `lookbackMin`
+- `fastWindowMin`
+- `slowWindowMin`
+- `targetPct`
+- `minReboundPct`
+- `maxDistanceFromLowPct`
+
+### 触发要点
+
+核心计算：
+
+- `reboundPct = (currentPrice - recentLow) / recentLow * 100`
+- `drawdownFromHighPct = (recentHigh - currentPrice) / recentHigh * 100`
+
+必须同时满足：
+
+- `reboundPct >= minReboundPct`
+- `reboundPct <= maxDistanceFromLowPct`
+- `currentPrice >= fastMA`
+- `fastMA >= slowMA * 0.995`
+- 当前价距离近期高点仍有至少一定空间
+
+### 适用场景
+
+- 想抓局部反弹，而不是等到趋势完全恢复
+
+---
+
+## 4.7 `pullback_to_ma`
+
+### 目标定位
+
+用于识别上行趋势没有被破坏，只是回踩均线后再次启动的时刻。
+
+### 参数
+
+- `lookbackMin`
+- `fastWindowMin`
+- `slowWindowMin`
+- `targetPct`
+- `pullbackTolerancePct`
+- `minTrendPct`
+
+### 触发要点
+
+核心要求：
+
+- 快线仍高于慢线
+- 当前价仍在慢线附近或上方
+- 当前价对前高有一定回撤
+- 当前价重新站上 fast MA
+
+### 适用场景
+
+- 趋势中继，而不是底部尝试
+
+---
+
+## 4.8 `failed_breakdown`（实验）
+
+### 目标定位
+
+用于识别：
+
+- 价格已经发生较深回撤
+- 上一拍贴近局部低点
+- 当前这一拍重新站回结构上方
+
+它比 `entry_rebound` 更强调：
+
+- **跌不下去 + 快速收回**
+
+### 参数
+
+- `lookbackMin`
+- `fastWindowMin`
+- `slowWindowMin`
+- `targetPct`
+- `reclaimPct`
+- `maxDistanceFromLowPct`
+- `minDrawdownPct`
+
+### 触发逻辑
+
+在 `lookbackMin` 内计算：
+
+- `recentHigh`
+- `recentLow`
+- `fastMA`
+- `slowMA`
+
+再计算：
+
+- `reboundPct = (currentPrice - recentLow) / recentLow * 100`
+- `drawdownFromHighPct = (recentHigh - currentPrice) / recentHigh * 100`
+- `previousDistanceFromLowPct = (previousPrice - recentLow) / recentLow * 100`
+
+必须同时满足：
+
+1. `drawdownFromHighPct >= minDrawdownPct`
+2. `previousDistanceFromLowPct <= reclaimPct`
+3. `reboundPct >= reclaimPct`
+4. `reboundPct <= maxDistanceFromLowPct`
+5. `currentPrice >= fastMA`
+6. `fastMA >= slowMA * 0.99`
+7. `currentPrice > previousPrice`
+
+### 当前版本的边界
+
+这是 **close-based proxy** 版，不是完整 K 线版。
+
+所以它当前更准确的理解是：
+
+- “深度回撤后的低位收复尝试”
+
+而不是严格意义上的：
+
+- “盘中跌破后收回”
+
+### 后续可优化方向
+
+- 接入 OHLCV 后增加真正的 wick / breakdown reclaim 判断
+- 加入 volume 过滤
+- 加入二次回踩确认
 
 2. **均线趋势向上**
 

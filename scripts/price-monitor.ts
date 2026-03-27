@@ -223,6 +223,25 @@ function buildPriceAlertMessage(
         }
     }
 
+    if (snapshot?.kind === 'failed_breakdown') {
+        const reboundPct = toNumber(snapshot.reboundPct);
+        const targetPct = toNumber(snapshot.targetPct);
+        const fastMA = toNumber(snapshot.fastMA);
+        const slowMA = toNumber(snapshot.slowMA);
+        const drawdownFromHighPct = toNumber(snapshot.drawdownFromHighPct);
+        const previousDistanceFromLowPct = toNumber(snapshot.previousDistanceFromLowPct);
+
+        if (drawdownFromHighPct !== null) lines.push(`<b>Drawdown:</b> ${formatPct(-drawdownFromHighPct)}`);
+        if (previousDistanceFromLowPct !== null) lines.push(`<b>Prev To Low:</b> ${formatPct(previousDistanceFromLowPct)}`);
+        if (reboundPct !== null) lines.push(`<b>Reclaim:</b> ${formatPct(reboundPct)}`);
+        if (fastMA !== null && slowMA !== null) {
+            lines.push(`<b>MA:</b> ${formatPrice(fastMA)} / ${formatPrice(slowMA)}`);
+        }
+        if (targetPct !== null) {
+            lines.push(`<b>Target:</b> +${targetPct}% follow-through`);
+        }
+    }
+
     const dexLink = `<a href="https://dexscreener.com/solana/${token.mint}">DexScreener</a>`;
     const birdeyeLink = `<a href="https://birdeye.so/token/${token.mint}">Birdeye</a>`;
     lines.push(`🔗 ${dexLink} | ${birdeyeLink}`);
