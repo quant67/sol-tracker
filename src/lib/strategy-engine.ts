@@ -38,6 +38,10 @@ function toFiniteNumber(value: unknown): number | null {
     return num;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null;
+}
+
 export function parseStrategyType(value: unknown): StrategyType | null {
     if (value === 'pct_change_up' || value === 'pct_change_down' || value === 'breakout_up' || value === 'breakout_down' || value === 'entry_long' || value === 'entry_rebound' || value === 'pullback_to_ma') {
         return value;
@@ -56,7 +60,7 @@ export function normalizeStrategy(raw: Record<string, unknown> | null | undefine
         watchTokenId: String(raw.watch_token_id),
         name: String(raw.name || raw.type),
         type,
-        params: (raw.params && typeof raw.params === 'object') ? raw.params : {},
+        params: isRecord(raw.params) ? raw.params : {},
         cooldownSec: cooldown && cooldown > 0 ? Math.floor(cooldown) : 300,
         chatId: raw.chat_id ? String(raw.chat_id) : null,
     };

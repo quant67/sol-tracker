@@ -104,8 +104,10 @@ export function StrategyOptimizerPanel() {
 
     useEffect(() => {
         fetchWatchTokens();
-        const timer = setInterval(fetchWatchTokens, POLL_INTERVAL);
-        return () => clearInterval(timer);
+        const timer = window.setInterval(() => {
+            void fetchWatchTokens();
+        }, POLL_INTERVAL);
+        return () => window.clearInterval(timer);
     }, [fetchWatchTokens]);
 
     const selectedToken = useMemo(
