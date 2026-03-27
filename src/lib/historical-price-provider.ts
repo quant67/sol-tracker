@@ -78,12 +78,16 @@ async function readCache(mint: string, interval: HistoricalInterval, historyDays
 }
 
 async function writeCache(result: HistoricalSeriesResult): Promise<void> {
-    await mkdir(CACHE_DIR, { recursive: true });
-    const payload: CachePayload = {
-        ...result,
-        createdAt: new Date().toISOString(),
-    };
-    await writeFile(getCachePath(result.mint, result.interval, result.historyDays), JSON.stringify(payload, null, 2), 'utf8');
+    try {
+        await mkdir(CACHE_DIR, { recursive: true });
+        const payload: CachePayload = {
+            ...result,
+            createdAt: new Date().toISOString(),
+        };
+        await writeFile(getCachePath(result.mint, result.interval, result.historyDays), JSON.stringify(payload, null, 2), 'utf8');
+    } catch (error) {
+        console.warn('[historical-price-provider] cache write skipped:', error);
+    }
 }
 
 async function fetchJson<T>(url: string): Promise<T> {

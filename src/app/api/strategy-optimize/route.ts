@@ -3,6 +3,9 @@ import { supabase } from '@/lib/supabase';
 import { getHistoricalPriceSeries, type HistoricalInterval } from '@/lib/historical-price-provider';
 import { optimizeSwingStrategies, type OptimizationStyle } from '@/lib/strategy-optimizer';
 
+export const runtime = 'nodejs';
+export const maxDuration = 60;
+
 function isHistoricalInterval(value: unknown): value is HistoricalInterval {
     return value === '5m' || value === '15m' || value === '1h';
 }

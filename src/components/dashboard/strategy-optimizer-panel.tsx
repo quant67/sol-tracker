@@ -247,8 +247,17 @@ export function StrategyOptimizerPanel() {
             });
 
             if (!response.ok) {
-                const data = await response.json().catch(() => ({}));
-                throw new Error(data?.error || "Optimization failed");
+                const text = await response.text().catch(() => "");
+                let message = "Optimization failed";
+                if (text) {
+                    try {
+                        const data = JSON.parse(text) as { error?: string };
+                        message = data?.error || message;
+                    } catch {
+                        message = text.slice(0, 240);
+                    }
+                }
+                throw new Error(message);
             }
 
             const data = await response.json();

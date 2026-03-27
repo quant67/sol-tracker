@@ -95,6 +95,17 @@ type CandidateEvaluation = {
     compositeScore: number;
 };
 
+type RoughCandidateScore = {
+    candidate: CandidateDefinition;
+    strategyType: StrategyType;
+    lookaheadMin: number;
+    score: number;
+    metrics: CandidateMetrics;
+};
+
+const SHORTLIST_PER_TYPE = 4;
+const SHORTLIST_OVERALL = 8;
+
 type WindowCombo = {
     lookbackMin: number;
     fastWindowMin: number;
@@ -195,6 +206,23 @@ function buildStability(
     };
 }
 
+function evaluateCandidateRough(
+    candidate: CandidateDefinition,
+    mint: string,
+    points: HistoricalPricePoint[]
+): RoughCandidateScore {
+    const summary = runEntryStrategyBacktest(candidate.strategy, mint, points, candidate.lookaheadMin);
+    const metrics = metricsFromSummary(summary);
+
+    return {
+        candidate,
+        strategyType: candidate.strategy.type,
+        lookaheadMin: candidate.lookaheadMin,
+        score: scoreMetrics(metrics, 'primary'),
+        metrics,
+    };
+}
+
 function evaluateSummary(summary: ReturnType<typeof runEntryStrategyBacktest>): CandidateEvaluation {
     const metrics = metricsFromSummary(summary);
     const primaryScore = scoreMetrics(metrics, 'primary');
@@ -207,6 +235,39 @@ function evaluateSummary(summary: ReturnType<typeof runEntryStrategyBacktest>): 
         stability,
         compositeScore: Number((primaryScore * 0.6 + stability.stabilityScore * 0.4).toFixed(3)),
     };
+}
+
+function sortRoughCandidates(left: RoughCandidateScore, right: RoughCandidateScore): number {
+    return right.score - left.score
+        || right.metrics.resolvedSignals - left.metrics.resolvedSignals
+        || right.metrics.hitRate - left.metrics.hitRate
+        || right.metrics.avgEndReturnPct - left.metrics.avgEndReturnPct
+        || right.metrics.avgMfePct - left.metrics.avgMfePct;
+}
+
+function shortlistCandidates(
+    candidates: CandidateDefinition[],
+    mint: string,
+    points: HistoricalPricePoint[]
+): CandidateDefinition[] {
+    const roughScores = candidates.map((candidate) => evaluateCandidateRough(candidate, mint, points));
+    const shortlistedIds = new Set<string>();
+    const strategyTypes: StrategyType[] = ['entry_long', 'entry_rebound', 'pullback_to_ma', 'failed_breakdown'];
+
+    for (const strategyType of strategyTypes) {
+        roughScores
+            .filter((candidate) => candidate.strategyType === strategyType)
+            .sort(sortRoughCandidates)
+            .slice(0, SHORTLIST_PER_TYPE)
+            .forEach((candidate) => shortlistedIds.add(candidate.candidate.strategy.id));
+    }
+
+    roughScores
+        .sort(sortRoughCandidates)
+        .slice(0, SHORTLIST_OVERALL)
+        .forEach((candidate) => shortlistedIds.add(candidate.candidate.strategy.id));
+
+    return candidates.filter((candidate) => shortlistedIds.has(candidate.strategy.id));
 }
 
 function getIntervalMinutes(interval: HistoricalInterval): number {
@@ -514,7 +575,8 @@ export function optimizeSwingStrategies(request: OptimizationRequest): Optimizat
         ...buildFailedBreakdownCandidates(request.mint, request.watchTokenId, request.style, request.interval),
     ];
 
-    const scored = candidates.map((candidate) => evaluateCandidate(candidate, request.mint, request.series.points));
+    const shortlisted = shortlistCandidates(candidates, request.mint, request.series.points);
+    const scored = shortlisted.map((candidate) => evaluateCandidate(candidate, request.mint, request.series.points));
     const sorted = [...scored].sort(sortCandidates);
     const viable = sorted.filter((candidate) => candidate.metrics.resolvedSignals >= 4);
     const bestEntryLong = getTopCandidateByType(sorted, 'entry_long');
