@@ -231,11 +231,11 @@ sequenceDiagram
    - `historical-price-provider.ts` 从 GeckoTerminal 拉取主 pool 的 OHLCV，并写入 `.cache/historical-price`
    - `strategy-optimizer.ts` 对 `entry_long` / `entry_rebound` / `pullback_to_ma` 做参数搜索
    - 搜索空间按 K 线根数定义，再换算成分钟窗口，避免 `15m/1h` 粒度下窗口过短导致零信号
-   - `POST /api/strategy-optimize` 同时返回每种策略类型的最优参数和综合榜单，前端可一键写入 `price_strategies`
+   - `POST /api/strategy-optimize` 同时返回每种策略类型的最优参数和综合榜单，前端可单独应用或批量应用到 `price_strategies`
 
 4. **告警展示**
    - 告警命中后通过 `telegram.ts` 发送消息
-   - `Price Strategy Center` 负责管理 watch token 和策略
+   - `Price Strategy Center` 负责管理 watch token 和策略，当前 UI 已拆成 watchlist / strategy composer / strategy registry 三个工作区，降低信息拥挤
    - `Price Alert History` 负责展示触发记录
 
 ### 3.5 Dashboard 数据更新

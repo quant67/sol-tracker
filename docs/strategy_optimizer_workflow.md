@@ -40,6 +40,12 @@
 
 用户可以直接点击 `Apply Strategy` 把推荐参数写入 `price_strategies`。
 
+如果希望三类风格都先保留一套实盘配置，也可以点击：
+
+- `Apply All Featured`
+
+它会把 `entry_long`、`entry_rebound`、`pullback_to_ma` 当前各自的最优参数一并写入策略表，方便后续并行观察。
+
 ### 2.2 API
 
 新增优化 API：

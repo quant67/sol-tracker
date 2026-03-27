@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Activity, Loader2, Pause, Play, Plus, Target, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Plus, Pause, Play, Trash2 } from "lucide-react";
 
 type StrategyType = "pct_change_up" | "pct_change_down" | "breakout_up" | "breakout_down" | "entry_long" | "entry_rebound" | "pullback_to_ma";
 
@@ -39,6 +39,15 @@ function formatPrice(value: number | string | null): string {
     return `$${num.toPrecision(6)}`;
 }
 
+function formatParamValue(value: unknown): string {
+    if (typeof value === "number") {
+        return Number.isInteger(value) ? `${value}` : value.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+    }
+    if (typeof value === "string") return value;
+    if (typeof value === "boolean") return value ? "true" : "false";
+    return String(value);
+}
+
 function getRelatedToken(strategy: Strategy): { mint: string; symbol: string } {
     const raw = strategy.watch_tokens;
     const token = Array.isArray(raw) ? raw[0] : raw;
@@ -48,16 +57,44 @@ function getRelatedToken(strategy: Strategy): { mint: string; symbol: string } {
     };
 }
 
+function getStrategyTypeLabel(strategyType: StrategyType): string {
+    if (strategyType === "pct_change_up") return "Pct Change Up";
+    if (strategyType === "pct_change_down") return "Pct Change Down";
+    if (strategyType === "breakout_up") return "Breakout Up";
+    if (strategyType === "breakout_down") return "Breakout Down";
+    if (strategyType === "entry_long") return "Trend Continuation";
+    if (strategyType === "entry_rebound") return "Local Rebound";
+    return "Pullback To MA";
+}
+
+function getStrategyHint(strategyType: StrategyType): string {
+    if (strategyType === "pct_change_up" || strategyType === "pct_change_down") {
+        return "Simple momentum trigger using a fixed lookback window and percent move threshold.";
+    }
+    if (strategyType === "breakout_up" || strategyType === "breakout_down") {
+        return "Static price breakout alert that fires once current price crosses a target level.";
+    }
+    if (strategyType === "entry_long") {
+        return "Best for continuation entries near local highs when short-term trend stays strong.";
+    }
+    if (strategyType === "entry_rebound") {
+        return "Best for local low rebounds after price regains short-term structure.";
+    }
+    return "Best for trend pullbacks that reclaim moving averages and continue higher.";
+}
+
 export function PriceStrategyManager() {
     const [watchTokens, setWatchTokens] = useState<WatchToken[]>([]);
     const [strategies, setStrategies] = useState<Strategy[]>([]);
     const [loading, setLoading] = useState(true);
     const [busyAction, setBusyAction] = useState<string | null>(null);
-    const [errorMessage, setErrorMessage] = useState<string>("");
+    const [errorMessage, setErrorMessage] = useState("");
 
     const [mintInput, setMintInput] = useState("");
 
     const [selectedWatchTokenId, setSelectedWatchTokenId] = useState("");
+    const [strategyListScope, setStrategyListScope] = useState<"selected" | "all">("selected");
+    const [strategyStatusFilter, setStrategyStatusFilter] = useState<"active" | "all">("all");
     const [strategyType, setStrategyType] = useState<StrategyType>("pct_change_up");
     const [strategyName, setStrategyName] = useState("");
     const [windowMin, setWindowMin] = useState("5");
@@ -93,14 +130,19 @@ export function PriceStrategyManager() {
 
             const tokenData = await tokenRes.json();
             const strategyData = await strategyRes.json();
+            const tokenList = Array.isArray(tokenData) ? tokenData : [];
 
-            setWatchTokens(Array.isArray(tokenData) ? tokenData : []);
+            setWatchTokens(tokenList);
             setStrategies(Array.isArray(strategyData) ? strategyData : []);
             setErrorMessage("");
 
-            if (!selectedWatchTokenId && Array.isArray(tokenData) && tokenData.length > 0) {
-                const firstActive = tokenData.find((t: WatchToken) => t.is_active) || tokenData[0];
+            const hasSelected = tokenList.some((token: WatchToken) => token.id === selectedWatchTokenId);
+            if ((!selectedWatchTokenId || !hasSelected) && tokenList.length > 0) {
+                const firstActive = tokenList.find((token: WatchToken) => token.is_active) || tokenList[0];
                 setSelectedWatchTokenId(firstActive.id);
+            }
+            if (tokenList.length === 0) {
+                setSelectedWatchTokenId("");
             }
         } catch (error: unknown) {
             setErrorMessage(error instanceof Error ? error.message : "Unknown error");
@@ -110,24 +152,63 @@ export function PriceStrategyManager() {
     }, [selectedWatchTokenId]);
 
     useEffect(() => {
-        fetchAll();
-        const interval = setInterval(fetchAll, POLL_INTERVAL);
-        return () => clearInterval(interval);
+        void fetchAll();
+        const intervalId = window.setInterval(() => {
+            void fetchAll();
+        }, POLL_INTERVAL);
+        return () => window.clearInterval(intervalId);
     }, [fetchAll]);
 
     const activeTokenCount = useMemo(
-        () => watchTokens.filter((t) => t.is_active).length,
+        () => watchTokens.filter((token) => token.is_active).length,
         [watchTokens]
     );
 
     const activeStrategyCount = useMemo(
-        () => strategies.filter((s) => s.is_active).length,
+        () => strategies.filter((strategy) => strategy.is_active).length,
         [strategies]
     );
 
-    const handleAddWatchToken = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const selectedToken = useMemo(
+        () => watchTokens.find((token) => token.id === selectedWatchTokenId) || null,
+        [watchTokens, selectedWatchTokenId]
+    );
+
+    const strategyCountByTokenId = useMemo(() => {
+        const counts = new Map<string, number>();
+        for (const strategy of strategies) {
+            counts.set(strategy.watch_token_id, (counts.get(strategy.watch_token_id) || 0) + 1);
+        }
+        return counts;
+    }, [strategies]);
+
+    const filteredStrategies = useMemo(() => {
+        const filtered = strategies.filter((strategy) => {
+            if (strategyListScope === "selected" && selectedWatchTokenId && strategy.watch_token_id !== selectedWatchTokenId) {
+                return false;
+            }
+            if (strategyStatusFilter === "active" && !strategy.is_active) {
+                return false;
+            }
+            return true;
+        });
+
+        return [...filtered].sort((left, right) => {
+            if (left.is_active !== right.is_active) {
+                return left.is_active ? -1 : 1;
+            }
+            return left.name.localeCompare(right.name);
+        });
+    }, [selectedWatchTokenId, strategies, strategyListScope, strategyStatusFilter]);
+
+    const selectedTokenStrategyCount = selectedWatchTokenId
+        ? strategies.filter((strategy) => strategy.watch_token_id === selectedWatchTokenId).length
+        : 0;
+
+    const handleAddWatchToken = async (event: React.FormEvent) => {
+        event.preventDefault();
         if (!mintInput.trim()) return;
+
         setBusyAction("add-token");
         try {
             const res = await fetch("/api/watch-tokens", {
@@ -186,8 +267,8 @@ export function PriceStrategyManager() {
         }
     };
 
-    const handleAddStrategy = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleAddStrategy = async (event: React.FormEvent) => {
+        event.preventDefault();
         if (!selectedWatchTokenId) {
             setErrorMessage("Please choose a watch token first.");
             return;
@@ -372,7 +453,7 @@ export function PriceStrategyManager() {
                 <div>
                     <h2 className="text-lg font-semibold text-foreground">Price Strategy Center</h2>
                     <p className="text-xs text-muted-foreground mt-1">
-                        Watch Tokens {activeTokenCount}/{watchTokens.length} · Active Strategies {activeStrategyCount}/{strategies.length}
+                        Operate the watchlist, compose strategies, and keep the active registry readable.
                     </p>
                 </div>
                 {loading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
@@ -384,287 +465,454 @@ export function PriceStrategyManager() {
                 </div>
             )}
 
-            <div className="p-6 grid grid-cols-1 xl:grid-cols-2 gap-6">
-                <section className="space-y-4">
-                    <h3 className="text-sm font-semibold text-foreground">Watch Tokens</h3>
-                    <form onSubmit={handleAddWatchToken} className="flex gap-2">
-                        <Input
-                            placeholder="Token mint address..."
-                            value={mintInput}
-                            onChange={(e) => setMintInput(e.target.value)}
-                            className="font-mono text-xs"
-                        />
-                        <Button type="submit" size="sm" disabled={busyAction === "add-token"}>
-                            {busyAction === "add-token" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-                            Add
-                        </Button>
-                    </form>
-
-                    <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
-                        {watchTokens.length === 0 && !loading && (
-                            <div className="text-xs text-muted-foreground italic py-3">No watch tokens yet.</div>
-                        )}
-
-                        {watchTokens.map((token) => (
-                            <div key={token.id} className="border border-border rounded-lg p-3 bg-muted/20">
-                                <div className="flex items-center justify-between gap-2">
-                                    <div className="min-w-0">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-sm font-semibold text-foreground">{token.symbol || "TOKEN"}</span>
-                                            <Badge variant={token.is_active ? "secondary" : "outline"}>
-                                                {token.is_active ? "ACTIVE" : "PAUSED"}
-                                            </Badge>
-                                        </div>
-                                        <p className="text-[11px] text-muted-foreground font-mono truncate mt-1">{token.mint}</p>
-                                    </div>
-                                    <div className="flex items-center gap-1 shrink-0">
-                                        <Button
-                                            variant="ghost"
-                                            size="icon-xs"
-                                            title={token.is_active ? "Pause token" : "Activate token"}
-                                            onClick={() => toggleWatchToken(token)}
-                                            disabled={busyAction === `token-toggle-${token.id}`}
-                                        >
-                                            {busyAction === `token-toggle-${token.id}` ? (
-                                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                            ) : token.is_active ? (
-                                                <Pause className="w-3.5 h-3.5 text-amber-400" />
-                                            ) : (
-                                                <Play className="w-3.5 h-3.5 text-emerald-400" />
-                                            )}
-                                        </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon-xs"
-                                            title="Delete token"
-                                            onClick={() => deleteWatchToken(token)}
-                                            disabled={busyAction === `token-delete-${token.id}`}
-                                        >
-                                            {busyAction === `token-delete-${token.id}` ? (
-                                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                            ) : (
-                                                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-                                            )}
-                                        </Button>
-                                    </div>
-                                </div>
-                                <div className="text-[11px] text-muted-foreground mt-2">
-                                    Last Price: <span className="font-mono text-foreground/80">{formatPrice(token.last_price)}</span>
-                                </div>
-                            </div>
-                        ))}
+            <div className="p-6 space-y-6">
+                <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+                    <div className="rounded-xl border border-border/70 bg-muted/15 p-4">
+                        <div className="text-[11px] text-muted-foreground">Watch Tokens</div>
+                        <div className="mt-2 text-2xl font-semibold text-foreground">{watchTokens.length}</div>
+                        <div className="mt-1 text-xs text-muted-foreground">{activeTokenCount} active</div>
                     </div>
-                </section>
+                    <div className="rounded-xl border border-border/70 bg-muted/15 p-4">
+                        <div className="text-[11px] text-muted-foreground">Strategies</div>
+                        <div className="mt-2 text-2xl font-semibold text-foreground">{strategies.length}</div>
+                        <div className="mt-1 text-xs text-muted-foreground">{activeStrategyCount} running</div>
+                    </div>
+                    <div className="rounded-xl border border-border/70 bg-muted/15 p-4">
+                        <div className="text-[11px] text-muted-foreground">Selected Token</div>
+                        <div className="mt-2 text-base font-semibold text-foreground">
+                            {selectedToken?.symbol || selectedToken?.name || "None"}
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                            {selectedToken ? `${selectedTokenStrategyCount} strategies attached` : "Pick a token from the watchlist"}
+                        </div>
+                    </div>
+                    <div className="rounded-xl border border-border/70 bg-muted/15 p-4">
+                        <div className="text-[11px] text-muted-foreground">Last Price</div>
+                        <div className="mt-2 text-base font-semibold text-foreground">
+                            {selectedToken ? formatPrice(selectedToken.last_price) : "N/A"}
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                            {selectedToken?.mint ? `${selectedToken.mint.slice(0, 6)}...${selectedToken.mint.slice(-4)}` : "No token selected"}
+                        </div>
+                    </div>
+                </div>
 
-                <section className="space-y-4">
-                    <h3 className="text-sm font-semibold text-foreground">Add Strategy</h3>
-                    <form onSubmit={handleAddStrategy} className="space-y-3 border border-border rounded-lg p-4 bg-muted/20">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                            <div>
-                                <label className="text-[11px] text-muted-foreground block mb-1">Watch Token</label>
-                                <select
-                                    value={selectedWatchTokenId}
-                                    onChange={(e) => setSelectedWatchTokenId(e.target.value)}
-                                    className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                >
-                                    <option value="">Select token</option>
-                                    {watchTokens.map((token) => (
-                                        <option key={token.id} value={token.id}>
-                                            {token.symbol || "TOKEN"} · {token.mint.slice(0, 6)}...{token.mint.slice(-4)}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="text-[11px] text-muted-foreground block mb-1">Type</label>
-                                <select
-                                    value={strategyType}
-                                    onChange={(e) => setStrategyType(e.target.value as StrategyType)}
-                                    className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                >
-                                    <option value="pct_change_up">pct_change_up</option>
-                                    <option value="pct_change_down">pct_change_down</option>
-                                    <option value="breakout_up">breakout_up</option>
-                                    <option value="breakout_down">breakout_down</option>
-                                    <option value="entry_long">entry_long</option>
-                                    <option value="entry_rebound">entry_rebound</option>
-                                    <option value="pullback_to_ma">pullback_to_ma</option>
-                                </select>
-                            </div>
+                <div className="grid grid-cols-1 xl:grid-cols-[280px_minmax(0,1fr)_360px] gap-6">
+                    <section className="space-y-4 xl:pr-6 xl:border-r xl:border-border">
+                        <div className="space-y-1">
+                            <h3 className="text-sm font-semibold text-foreground">Watchlist</h3>
+                            <p className="text-xs text-muted-foreground">
+                                Keep selection simple here, then build or review strategies against the chosen token.
+                            </p>
                         </div>
 
-                        <div>
-                            <label className="text-[11px] text-muted-foreground block mb-1">Strategy Name (optional)</label>
+                        <form onSubmit={handleAddWatchToken} className="flex gap-2">
                             <Input
-                                value={strategyName}
-                                onChange={(e) => setStrategyName(e.target.value)}
-                                placeholder="e.g. 5m Pump Alert"
+                                placeholder="Token mint address..."
+                                value={mintInput}
+                                onChange={(event) => setMintInput(event.target.value)}
+                                className="font-mono text-xs"
                             />
-                        </div>
+                            <Button type="submit" size="sm" disabled={busyAction === "add-token"}>
+                                {busyAction === "add-token" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                                Add
+                            </Button>
+                        </form>
 
-                        {(strategyType === "pct_change_up" || strategyType === "pct_change_down") ? (
-                            <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                    <label className="text-[11px] text-muted-foreground block mb-1">Window (min)</label>
-                                    <Input value={windowMin} onChange={(e) => setWindowMin(e.target.value)} />
+                        <div className="space-y-2 max-h-[560px] overflow-y-auto pr-1">
+                            {watchTokens.length === 0 && !loading && (
+                                <div className="rounded-xl border border-dashed border-border px-4 py-6 text-xs text-muted-foreground">
+                                    No watch tokens yet. Add a mint to start the strategy workflow.
                                 </div>
-                                <div>
-                                    <label className="text-[11px] text-muted-foreground block mb-1">Threshold (%)</label>
-                                    <Input value={thresholdPct} onChange={(e) => setThresholdPct(e.target.value)} />
-                                </div>
-                            </div>
-                        ) : (strategyType === "entry_long" || strategyType === "entry_rebound" || strategyType === "pullback_to_ma") ? (
-                            <div className="space-y-2">
-                                <div className="grid grid-cols-2 gap-2">
-                                    <div>
-                                        <label className="text-[11px] text-muted-foreground block mb-1">Lookback (min)</label>
-                                        <Input value={lookbackMin} onChange={(e) => setLookbackMin(e.target.value)} />
-                                    </div>
-                                    <div>
-                                        <label className="text-[11px] text-muted-foreground block mb-1">Target (%)</label>
-                                        <Input value={entryTargetPct} onChange={(e) => setEntryTargetPct(e.target.value)} />
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <div>
-                                        <label className="text-[11px] text-muted-foreground block mb-1">Fast MA (min)</label>
-                                        <Input value={fastWindowMin} onChange={(e) => setFastWindowMin(e.target.value)} />
-                                    </div>
-                                    <div>
-                                        <label className="text-[11px] text-muted-foreground block mb-1">Slow MA (min)</label>
-                                        <Input value={slowWindowMin} onChange={(e) => setSlowWindowMin(e.target.value)} />
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <div>
-                                        <label className="text-[11px] text-muted-foreground block mb-1">
-                                            {strategyType === "entry_long"
-                                                ? "Breakout Tolerance (%)"
-                                                : strategyType === "entry_rebound"
-                                                    ? "Min Rebound (%)"
-                                                    : "Pullback Tolerance (%)"}
-                                        </label>
-                                        <Input
-                                            value={strategyType === "entry_long"
-                                                ? breakoutTolerancePct
-                                                : strategyType === "entry_rebound"
-                                                    ? minReboundPct
-                                                    : pullbackTolerancePct}
-                                            onChange={(e) => strategyType === "entry_long"
-                                                ? setBreakoutTolerancePct(e.target.value)
-                                                : strategyType === "entry_rebound"
-                                                    ? setMinReboundPct(e.target.value)
-                                                    : setPullbackTolerancePct(e.target.value)}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-[11px] text-muted-foreground block mb-1">
-                                            {strategyType === "entry_long"
-                                                ? "Min Trend (%)"
-                                                : strategyType === "entry_rebound"
-                                                    ? "Max Distance From Low (%)"
-                                                    : "Min Trend (%)"}
-                                        </label>
-                                        <Input
-                                            value={strategyType === "entry_long"
-                                                ? minTrendPct
-                                                : strategyType === "entry_rebound"
-                                                    ? maxDistanceFromLowPct
-                                                    : minTrendPct}
-                                            onChange={(e) => strategyType === "entry_long"
-                                                ? setMinTrendPct(e.target.value)
-                                                : strategyType === "entry_rebound"
-                                                    ? setMaxDistanceFromLowPct(e.target.value)
-                                                    : setMinTrendPct(e.target.value)}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <div>
-                                <label className="text-[11px] text-muted-foreground block mb-1">Target Price ($)</label>
-                                <Input value={targetPrice} onChange={(e) => setTargetPrice(e.target.value)} />
-                            </div>
-                        )}
+                            )}
 
-                        <div className="grid grid-cols-2 gap-2">
-                            <div>
-                                <label className="text-[11px] text-muted-foreground block mb-1">Cooldown (sec)</label>
-                                <Input value={cooldownSec} onChange={(e) => setCooldownSec(e.target.value)} />
-                            </div>
-                            <div>
-                                <label className="text-[11px] text-muted-foreground block mb-1">Chat ID (optional)</label>
-                                <Input value={chatId} onChange={(e) => setChatId(e.target.value)} placeholder="default from env if empty" />
-                            </div>
-                        </div>
+                            {watchTokens.map((token) => {
+                                const isSelected = token.id === selectedWatchTokenId;
+                                const strategyCount = strategyCountByTokenId.get(token.id) || 0;
 
-                        <Button type="submit" disabled={busyAction === "add-strategy"} className="w-full">
-                            {busyAction === "add-strategy" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                            Create Strategy
-                        </Button>
-                    </form>
+                                return (
+                                    <div
+                                        key={token.id}
+                                        className={`rounded-xl border p-3 transition-colors ${
+                                            isSelected
+                                                ? "border-violet-500/40 bg-violet-500/10"
+                                                : "border-border/70 bg-muted/10 hover:bg-muted/20"
+                                        }`}
+                                    >
+                                        <div className="flex items-start gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setSelectedWatchTokenId(token.id)}
+                                                className="min-w-0 flex-1 text-left"
+                                            >
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="text-sm font-semibold text-foreground">{token.symbol || "TOKEN"}</span>
+                                                    <Badge variant={token.is_active ? "secondary" : "outline"}>
+                                                        {token.is_active ? "ACTIVE" : "PAUSED"}
+                                                    </Badge>
+                                                    <Badge variant="outline">{strategyCount} strategies</Badge>
+                                                </div>
+                                                <div className="mt-1 text-[11px] text-muted-foreground">
+                                                    {token.name || "Watch token"} · {formatPrice(token.last_price)}
+                                                </div>
+                                                <div className="mt-1 text-[11px] font-mono text-muted-foreground truncate">{token.mint}</div>
+                                            </button>
 
-                    <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
-                        {strategies.length === 0 && !loading && (
-                            <div className="text-xs text-muted-foreground italic py-3">No strategies yet.</div>
-                        )}
-                        {strategies.map((strategy) => {
-                            const token = getRelatedToken(strategy);
-                            return (
-                                <div key={strategy.id} className="border border-border rounded-lg p-3 bg-muted/20">
-                                    <div className="flex items-center justify-between gap-2">
-                                        <div className="min-w-0">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-sm font-semibold text-foreground truncate">{strategy.name}</span>
-                                                <Badge variant={strategy.is_active ? "secondary" : "outline"}>
-                                                    {strategy.is_active ? "RUNNING" : "PAUSED"}
-                                                </Badge>
+                                            <div className="flex items-center gap-1 shrink-0">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon-xs"
+                                                    title={token.is_active ? "Pause token" : "Activate token"}
+                                                    onClick={() => toggleWatchToken(token)}
+                                                    disabled={busyAction === `token-toggle-${token.id}`}
+                                                >
+                                                    {busyAction === `token-toggle-${token.id}` ? (
+                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                    ) : token.is_active ? (
+                                                        <Pause className="w-3.5 h-3.5 text-amber-400" />
+                                                    ) : (
+                                                        <Play className="w-3.5 h-3.5 text-emerald-400" />
+                                                    )}
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon-xs"
+                                                    title="Delete token"
+                                                    onClick={() => deleteWatchToken(token)}
+                                                    disabled={busyAction === `token-delete-${token.id}`}
+                                                >
+                                                    {busyAction === `token-delete-${token.id}` ? (
+                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                    ) : (
+                                                        <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                                                    )}
+                                                </Button>
                                             </div>
-                                            <p className="text-[11px] text-muted-foreground mt-1">
-                                                {strategy.type} · {token.symbol} · cooldown {strategy.cooldown_sec}s
-                                            </p>
-                                            <p className="text-[11px] text-muted-foreground font-mono truncate">{token.mint}</p>
-                                            <p className="text-[11px] text-muted-foreground font-mono truncate mt-1">
-                                                params: {JSON.stringify(strategy.params)}
-                                            </p>
                                         </div>
-                                        <div className="flex items-center gap-1 shrink-0">
-                                            <Button
-                                                variant="ghost"
-                                                size="icon-xs"
-                                                title={strategy.is_active ? "Pause strategy" : "Enable strategy"}
-                                                onClick={() => toggleStrategy(strategy)}
-                                                disabled={busyAction === `strategy-toggle-${strategy.id}`}
-                                            >
-                                                {busyAction === `strategy-toggle-${strategy.id}` ? (
-                                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                ) : strategy.is_active ? (
-                                                    <Pause className="w-3.5 h-3.5 text-amber-400" />
-                                                ) : (
-                                                    <Play className="w-3.5 h-3.5 text-emerald-400" />
-                                                )}
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon-xs"
-                                                title="Delete strategy"
-                                                onClick={() => deleteStrategy(strategy)}
-                                                disabled={busyAction === `strategy-delete-${strategy.id}`}
-                                            >
-                                                {busyAction === `strategy-delete-${strategy.id}` ? (
-                                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                ) : (
-                                                    <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-                                                )}
-                                            </Button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </section>
+
+                    <section className="space-y-4 min-w-0">
+                        <div className="space-y-1">
+                            <h3 className="text-sm font-semibold text-foreground">Strategy Composer</h3>
+                            <p className="text-xs text-muted-foreground">
+                                Build a manual strategy for the selected token without losing context to a crowded form.
+                            </p>
+                        </div>
+
+                        <div className="rounded-xl border border-border/70 bg-muted/10 p-4">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div>
+                                    <div className="text-[11px] text-muted-foreground">Selected token</div>
+                                    <div className="text-base font-semibold text-foreground">
+                                        {selectedToken?.symbol || selectedToken?.name || "Choose a token"}
+                                    </div>
+                                </div>
+                                {selectedToken && (
+                                    <div className="text-right">
+                                        <div className="text-[11px] text-muted-foreground">Last price</div>
+                                        <div className="text-sm font-semibold text-foreground">{formatPrice(selectedToken.last_price)}</div>
+                                    </div>
+                                )}
+                            </div>
+                            {selectedToken && (
+                                <div className="mt-3 text-[11px] font-mono text-muted-foreground break-all">
+                                    {selectedToken.mint}
+                                </div>
+                            )}
+                        </div>
+
+                        <form onSubmit={handleAddStrategy} className="space-y-5 rounded-2xl border border-border/70 bg-muted/10 p-5">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-[11px] text-muted-foreground block mb-1">Watch Token</label>
+                                    <select
+                                        value={selectedWatchTokenId}
+                                        onChange={(event) => setSelectedWatchTokenId(event.target.value)}
+                                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    >
+                                        <option value="">Select token</option>
+                                        {watchTokens.map((token) => (
+                                            <option key={token.id} value={token.id}>
+                                                {token.symbol || "TOKEN"} · {token.mint.slice(0, 6)}...{token.mint.slice(-4)}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="text-[11px] text-muted-foreground block mb-1">Strategy Type</label>
+                                    <select
+                                        value={strategyType}
+                                        onChange={(event) => setStrategyType(event.target.value as StrategyType)}
+                                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    >
+                                        <option value="pct_change_up">pct_change_up</option>
+                                        <option value="pct_change_down">pct_change_down</option>
+                                        <option value="breakout_up">breakout_up</option>
+                                        <option value="breakout_down">breakout_down</option>
+                                        <option value="entry_long">entry_long</option>
+                                        <option value="entry_rebound">entry_rebound</option>
+                                        <option value="pullback_to_ma">pullback_to_ma</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="rounded-xl border border-border/60 bg-background/50 p-4">
+                                <div className="flex items-center gap-2">
+                                    <Target className="w-4 h-4 text-violet-400" />
+                                    <div className="text-sm font-semibold text-foreground">{getStrategyTypeLabel(strategyType)}</div>
+                                </div>
+                                <p className="mt-2 text-xs text-muted-foreground">{getStrategyHint(strategyType)}</p>
+                            </div>
+
+                            <div>
+                                <label className="text-[11px] text-muted-foreground block mb-1">Strategy Name (optional)</label>
+                                <Input
+                                    value={strategyName}
+                                    onChange={(event) => setStrategyName(event.target.value)}
+                                    placeholder="e.g. 5m Pump Alert"
+                                />
+                            </div>
+
+                            {(strategyType === "pct_change_up" || strategyType === "pct_change_down") ? (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-[11px] text-muted-foreground block mb-1">Window (min)</label>
+                                        <Input value={windowMin} onChange={(event) => setWindowMin(event.target.value)} />
+                                    </div>
+                                    <div>
+                                        <label className="text-[11px] text-muted-foreground block mb-1">Threshold (%)</label>
+                                        <Input value={thresholdPct} onChange={(event) => setThresholdPct(event.target.value)} />
+                                    </div>
+                                </div>
+                            ) : (strategyType === "entry_long" || strategyType === "entry_rebound" || strategyType === "pullback_to_ma") ? (
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="text-[11px] text-muted-foreground block mb-1">Lookback (min)</label>
+                                            <Input value={lookbackMin} onChange={(event) => setLookbackMin(event.target.value)} />
+                                        </div>
+                                        <div>
+                                            <label className="text-[11px] text-muted-foreground block mb-1">Target (%)</label>
+                                            <Input value={entryTargetPct} onChange={(event) => setEntryTargetPct(event.target.value)} />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="text-[11px] text-muted-foreground block mb-1">Fast MA (min)</label>
+                                            <Input value={fastWindowMin} onChange={(event) => setFastWindowMin(event.target.value)} />
+                                        </div>
+                                        <div>
+                                            <label className="text-[11px] text-muted-foreground block mb-1">Slow MA (min)</label>
+                                            <Input value={slowWindowMin} onChange={(event) => setSlowWindowMin(event.target.value)} />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="text-[11px] text-muted-foreground block mb-1">
+                                                {strategyType === "entry_long"
+                                                    ? "Breakout Tolerance (%)"
+                                                    : strategyType === "entry_rebound"
+                                                        ? "Min Rebound (%)"
+                                                        : "Pullback Tolerance (%)"}
+                                            </label>
+                                            <Input
+                                                value={strategyType === "entry_long"
+                                                    ? breakoutTolerancePct
+                                                    : strategyType === "entry_rebound"
+                                                        ? minReboundPct
+                                                        : pullbackTolerancePct}
+                                                onChange={(event) => strategyType === "entry_long"
+                                                    ? setBreakoutTolerancePct(event.target.value)
+                                                    : strategyType === "entry_rebound"
+                                                        ? setMinReboundPct(event.target.value)
+                                                        : setPullbackTolerancePct(event.target.value)}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[11px] text-muted-foreground block mb-1">
+                                                {strategyType === "entry_long"
+                                                    ? "Min Trend (%)"
+                                                    : strategyType === "entry_rebound"
+                                                        ? "Max Distance From Low (%)"
+                                                        : "Min Trend (%)"}
+                                            </label>
+                                            <Input
+                                                value={strategyType === "entry_long"
+                                                    ? minTrendPct
+                                                    : strategyType === "entry_rebound"
+                                                        ? maxDistanceFromLowPct
+                                                        : minTrendPct}
+                                                onChange={(event) => strategyType === "entry_long"
+                                                    ? setMinTrendPct(event.target.value)
+                                                    : strategyType === "entry_rebound"
+                                                        ? setMaxDistanceFromLowPct(event.target.value)
+                                                        : setMinTrendPct(event.target.value)}
+                                            />
                                         </div>
                                     </div>
                                 </div>
-                            );
-                        })}
-                    </div>
-                </section>
+                            ) : (
+                                <div>
+                                    <label className="text-[11px] text-muted-foreground block mb-1">Target Price ($)</label>
+                                    <Input value={targetPrice} onChange={(event) => setTargetPrice(event.target.value)} />
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-[11px] text-muted-foreground block mb-1">Cooldown (sec)</label>
+                                    <Input value={cooldownSec} onChange={(event) => setCooldownSec(event.target.value)} />
+                                </div>
+                                <div>
+                                    <label className="text-[11px] text-muted-foreground block mb-1">Chat ID (optional)</label>
+                                    <Input
+                                        value={chatId}
+                                        onChange={(event) => setChatId(event.target.value)}
+                                        placeholder="default from env if empty"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end">
+                                <Button type="submit" disabled={busyAction === "add-strategy"}>
+                                    {busyAction === "add-strategy" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                                    Create Strategy
+                                </Button>
+                            </div>
+                        </form>
+                    </section>
+
+                    <section className="space-y-4 xl:pl-6 xl:border-l xl:border-border">
+                        <div className="space-y-1">
+                            <h3 className="text-sm font-semibold text-foreground">Strategy Registry</h3>
+                            <p className="text-xs text-muted-foreground">
+                                Review only what matters right now instead of scanning one long mixed list.
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="text-[11px] text-muted-foreground block mb-1">Scope</label>
+                                <select
+                                    value={strategyListScope}
+                                    onChange={(event) => setStrategyListScope(event.target.value as "selected" | "all")}
+                                    className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                >
+                                    <option value="selected">Selected token</option>
+                                    <option value="all">All tokens</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-[11px] text-muted-foreground block mb-1">Status</label>
+                                <select
+                                    value={strategyStatusFilter}
+                                    onChange={(event) => setStrategyStatusFilter(event.target.value as "active" | "all")}
+                                    className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                >
+                                    <option value="all">All strategies</option>
+                                    <option value="active">Active only</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="rounded-xl border border-border/70 bg-muted/10 p-4 flex items-center justify-between gap-3">
+                            <div>
+                                <div className="text-[11px] text-muted-foreground">Visible strategies</div>
+                                <div className="text-lg font-semibold text-foreground">{filteredStrategies.length}</div>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <Activity className="w-4 h-4 text-violet-400" />
+                                {strategyStatusFilter === "active" ? "Focused on live signals" : "Showing all saved rules"}
+                            </div>
+                        </div>
+
+                        <div className="space-y-3 max-h-[560px] overflow-y-auto pr-1">
+                            {filteredStrategies.length === 0 && !loading && (
+                                <div className="rounded-xl border border-dashed border-border px-4 py-6 text-xs text-muted-foreground">
+                                    No strategies match the current filter. Try switching scope or creating one from the composer.
+                                </div>
+                            )}
+
+                            {filteredStrategies.map((strategy) => {
+                                const token = getRelatedToken(strategy);
+                                const paramEntries = Object.entries(strategy.params || {}).slice(0, 6);
+
+                                return (
+                                    <div key={strategy.id} className="rounded-xl border border-border/70 bg-muted/10 p-4">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="text-sm font-semibold text-foreground truncate">{strategy.name}</span>
+                                                    <Badge variant={strategy.is_active ? "secondary" : "outline"}>
+                                                        {strategy.is_active ? "RUNNING" : "PAUSED"}
+                                                    </Badge>
+                                                    <Badge variant="outline">{getStrategyTypeLabel(strategy.type)}</Badge>
+                                                </div>
+                                                <div className="mt-1 text-[11px] text-muted-foreground">
+                                                    {token.symbol} · cooldown {strategy.cooldown_sec}s
+                                                </div>
+                                                <div className="mt-1 text-[11px] font-mono text-muted-foreground truncate">
+                                                    {token.mint}
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-1 shrink-0">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon-xs"
+                                                    title={strategy.is_active ? "Pause strategy" : "Enable strategy"}
+                                                    onClick={() => toggleStrategy(strategy)}
+                                                    disabled={busyAction === `strategy-toggle-${strategy.id}`}
+                                                >
+                                                    {busyAction === `strategy-toggle-${strategy.id}` ? (
+                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                    ) : strategy.is_active ? (
+                                                        <Pause className="w-3.5 h-3.5 text-amber-400" />
+                                                    ) : (
+                                                        <Play className="w-3.5 h-3.5 text-emerald-400" />
+                                                    )}
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon-xs"
+                                                    title="Delete strategy"
+                                                    onClick={() => deleteStrategy(strategy)}
+                                                    disabled={busyAction === `strategy-delete-${strategy.id}`}
+                                                >
+                                                    {busyAction === `strategy-delete-${strategy.id}` ? (
+                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                    ) : (
+                                                        <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                                                    )}
+                                                </Button>
+                                            </div>
+                                        </div>
+
+                                        {paramEntries.length > 0 && (
+                                            <div className="mt-3 flex flex-wrap gap-2">
+                                                {paramEntries.map(([key, value]) => (
+                                                    <span
+                                                        key={`${strategy.id}-${key}`}
+                                                        className="rounded-full border border-border/70 bg-background/60 px-2.5 py-1 text-[11px] text-muted-foreground"
+                                                    >
+                                                        <span className="text-foreground">{key}</span> {formatParamValue(value)}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </section>
+                </div>
             </div>
         </div>
     );

@@ -88,6 +88,7 @@ export function StrategyOptimizerPanel() {
     const [loading, setLoading] = useState(true);
     const [running, setRunning] = useState(false);
     const [applyingKey, setApplyingKey] = useState<string | null>(null);
+    const [batchApplying, setBatchApplying] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
     const [statusMessage, setStatusMessage] = useState("");
     const [result, setResult] = useState<OptimizationResponse | null>(null);
@@ -133,6 +134,30 @@ export function StrategyOptimizerPanel() {
             .filter((recommendation): recommendation is Recommendation => recommendation !== null),
         [result]
     );
+
+    const createStrategyFromRecommendation = useCallback(async (recommendation: Recommendation) => {
+        if (!result?.token?.id) {
+            throw new Error("No target token selected.");
+        }
+
+        const response = await fetch("/api/price-strategies", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                watch_token_id: result.token.id,
+                name: `${recommendation.strategyType} ${result.token.symbol || result.token.mint.slice(0, 6)} optimized`,
+                type: recommendation.strategyType,
+                params: recommendation.params,
+                cooldown_sec: 300,
+                chat_id: null,
+            }),
+        });
+
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data?.error || "Failed to apply recommendation");
+        }
+    }, [result]);
 
     const runOptimization = async () => {
         if (!selectedWatchTokenId) {
@@ -190,30 +215,45 @@ export function StrategyOptimizerPanel() {
         setStatusMessage("");
 
         try {
-            const response = await fetch("/api/price-strategies", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    watch_token_id: result.token.id,
-                    name: `${recommendation.strategyType} ${result.token.symbol || result.token.mint.slice(0, 6)} optimized`,
-                    type: recommendation.strategyType,
-                    params: recommendation.params,
-                    cooldown_sec: 300,
-                    chat_id: null,
-                }),
-            });
-
-            if (!response.ok) {
-                const data = await response.json().catch(() => ({}));
-                throw new Error(data?.error || "Failed to apply recommendation");
-            }
-
+            await createStrategyFromRecommendation(recommendation);
             setStatusMessage(`Strategy applied: ${recommendation.strategyType}`);
         } catch (error: unknown) {
             setErrorMessage(error instanceof Error ? error.message : "Unknown error");
         } finally {
             setApplyingKey(null);
         }
+    };
+
+    const applyFeaturedRecommendations = async () => {
+        if (!result?.token?.id || featuredRecommendations.length === 0) return;
+
+        setBatchApplying(true);
+        setApplyingKey(null);
+        setErrorMessage("");
+        setStatusMessage("");
+
+        let successCount = 0;
+        const failures: string[] = [];
+
+        for (const recommendation of featuredRecommendations) {
+            try {
+                await createStrategyFromRecommendation(recommendation);
+                successCount += 1;
+            } catch (error: unknown) {
+                const message = error instanceof Error ? error.message : "Unknown error";
+                failures.push(`${recommendation.strategyType}: ${message}`);
+            }
+        }
+
+        if (successCount > 0) {
+            setStatusMessage(`Applied ${successCount} featured strategies.`);
+        }
+
+        if (failures.length > 0) {
+            setErrorMessage(`Some strategies failed: ${failures.join(" | ")}`);
+        }
+
+        setBatchApplying(false);
     };
 
     return (
@@ -344,6 +384,17 @@ export function StrategyOptimizerPanel() {
                                         <p className="text-xs text-muted-foreground mt-1">
                                             Each strategy family keeps one independent best setup so you can compare continuation, rebound and pullback styles side by side.
                                         </p>
+                                    </div>
+                                    <div className="flex justify-end">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={applyFeaturedRecommendations}
+                                            disabled={batchApplying || featuredRecommendations.length === 0}
+                                        >
+                                            {batchApplying ? <Loader2 className="w-4 h-4 animate-spin" /> : <WandSparkles className="w-4 h-4" />}
+                                            Apply All Featured
+                                        </Button>
                                     </div>
                                     <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
                                         {featuredRecommendations.map((recommendation) => {
