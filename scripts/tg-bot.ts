@@ -101,11 +101,15 @@ function strategyUsageText(): string {
         '/strategyadd <mint> breakout_up <targetPrice> [cooldownSec]',
         '/strategyadd <mint> breakout_down <targetPrice> [cooldownSec]',
         '/strategyadd <mint> entry_long <lookbackMin> <fastWindowMin> <slowWindowMin> <targetPct> [cooldownSec] [breakoutTolerancePct] [minTrendPct]',
+        '/strategyadd <mint> entry_rebound <lookbackMin> <fastWindowMin> <slowWindowMin> <targetPct> [cooldownSec] [minReboundPct] [maxDistanceFromLowPct]',
+        '/strategyadd <mint> pullback_to_ma <lookbackMin> <fastWindowMin> <slowWindowMin> <targetPct> [cooldownSec] [pullbackTolerancePct] [minTrendPct]',
         '',
         'Examples:',
         '/strategyadd 7vfCXT... pct_change_up 5 10 300',
         '/strategyadd 7vfCXT... breakout_down 0.00025 600',
         '/strategyadd 7vfCXT... entry_long 30 5 15 10 300 1.5 2',
+        '/strategyadd 7vfCXT... entry_rebound 30 5 15 8 300 1.5 6',
+        '/strategyadd 7vfCXT... pullback_to_ma 45 5 20 8 300 1.5 3',
     ].join('\n');
 }
 
@@ -143,6 +147,52 @@ function buildStrategyPayload(
                 targetPct,
                 breakoutTolerancePct: breakoutTolerancePct ?? 1.5,
                 minTrendPct: minTrendPct ?? 2,
+            },
+            cooldownSec: cooldownSec ? Math.floor(cooldownSec) : 300,
+        };
+    }
+
+    if (strategyType === 'entry_rebound') {
+        if (parts.length < 7) return null;
+        const lookbackMin = parsePositiveNumber(parts[3]);
+        const fastWindowMin = parsePositiveNumber(parts[4]);
+        const slowWindowMin = parsePositiveNumber(parts[5]);
+        const targetPct = parsePositiveNumber(parts[6]);
+        if (!lookbackMin || !fastWindowMin || !slowWindowMin || !targetPct) return null;
+        const cooldownSec = parts[7] ? parsePositiveNumber(parts[7]) : 300;
+        const minReboundPct = parts[8] ? parsePositiveNumber(parts[8]) : 1.5;
+        const maxDistanceFromLowPct = parts[9] ? parsePositiveNumber(parts[9]) : 6;
+        return {
+            params: {
+                lookbackMin,
+                fastWindowMin,
+                slowWindowMin,
+                targetPct,
+                minReboundPct: minReboundPct ?? 1.5,
+                maxDistanceFromLowPct: maxDistanceFromLowPct ?? 6,
+            },
+            cooldownSec: cooldownSec ? Math.floor(cooldownSec) : 300,
+        };
+    }
+
+    if (strategyType === 'pullback_to_ma') {
+        if (parts.length < 7) return null;
+        const lookbackMin = parsePositiveNumber(parts[3]);
+        const fastWindowMin = parsePositiveNumber(parts[4]);
+        const slowWindowMin = parsePositiveNumber(parts[5]);
+        const targetPct = parsePositiveNumber(parts[6]);
+        if (!lookbackMin || !fastWindowMin || !slowWindowMin || !targetPct) return null;
+        const cooldownSec = parts[7] ? parsePositiveNumber(parts[7]) : 300;
+        const pullbackTolerancePct = parts[8] ? parsePositiveNumber(parts[8]) : 1.5;
+        const minTrendPct = parts[9] ? parsePositiveNumber(parts[9]) : 3;
+        return {
+            params: {
+                lookbackMin,
+                fastWindowMin,
+                slowWindowMin,
+                targetPct,
+                pullbackTolerancePct: pullbackTolerancePct ?? 1.5,
+                minTrendPct: minTrendPct ?? 3,
             },
             cooldownSec: cooldownSec ? Math.floor(cooldownSec) : 300,
         };

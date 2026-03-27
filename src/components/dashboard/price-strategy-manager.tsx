@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2, Plus, Pause, Play, Trash2 } from "lucide-react";
 
-type StrategyType = "pct_change_up" | "pct_change_down" | "breakout_up" | "breakout_down" | "entry_long";
+type StrategyType = "pct_change_up" | "pct_change_down" | "breakout_up" | "breakout_down" | "entry_long" | "entry_rebound" | "pullback_to_ma";
 
 interface WatchToken {
     id: string;
@@ -69,6 +69,9 @@ export function PriceStrategyManager() {
     const [entryTargetPct, setEntryTargetPct] = useState("10");
     const [breakoutTolerancePct, setBreakoutTolerancePct] = useState("1.5");
     const [minTrendPct, setMinTrendPct] = useState("2");
+    const [minReboundPct, setMinReboundPct] = useState("1.5");
+    const [maxDistanceFromLowPct, setMaxDistanceFromLowPct] = useState("6");
+    const [pullbackTolerancePct, setPullbackTolerancePct] = useState("1.5");
     const [cooldownSec, setCooldownSec] = useState("300");
     const [chatId, setChatId] = useState("");
 
@@ -231,6 +234,62 @@ export function PriceStrategyManager() {
                 slowWindowMin: slowNum,
                 targetPct: targetNum,
                 breakoutTolerancePct: breakoutPctNum,
+                minTrendPct: trendPctNum,
+            };
+        } else if (strategyType === "entry_rebound") {
+            const lookbackNum = Number(lookbackMin || "0");
+            const fastNum = Number(fastWindowMin || "0");
+            const slowNum = Number(slowWindowMin || "0");
+            const targetNum = Number(entryTargetPct || "0");
+            const reboundPctNum = Number(minReboundPct || "0");
+            const distancePctNum = Number(maxDistanceFromLowPct || "0");
+
+            if (
+                !Number.isFinite(lookbackNum) || lookbackNum <= 0 ||
+                !Number.isFinite(fastNum) || fastNum <= 0 ||
+                !Number.isFinite(slowNum) || slowNum <= 0 ||
+                !Number.isFinite(targetNum) || targetNum <= 0 ||
+                !Number.isFinite(reboundPctNum) || reboundPctNum < 0 ||
+                !Number.isFinite(distancePctNum) || distancePctNum <= 0
+            ) {
+                setErrorMessage("Rebound signal parameters must be valid positive numbers.");
+                return;
+            }
+
+            params = {
+                lookbackMin: lookbackNum,
+                fastWindowMin: fastNum,
+                slowWindowMin: slowNum,
+                targetPct: targetNum,
+                minReboundPct: reboundPctNum,
+                maxDistanceFromLowPct: distancePctNum,
+            };
+        } else if (strategyType === "pullback_to_ma") {
+            const lookbackNum = Number(lookbackMin || "0");
+            const fastNum = Number(fastWindowMin || "0");
+            const slowNum = Number(slowWindowMin || "0");
+            const targetNum = Number(entryTargetPct || "0");
+            const pullbackPctNum = Number(pullbackTolerancePct || "0");
+            const trendPctNum = Number(minTrendPct || "0");
+
+            if (
+                !Number.isFinite(lookbackNum) || lookbackNum <= 0 ||
+                !Number.isFinite(fastNum) || fastNum <= 0 ||
+                !Number.isFinite(slowNum) || slowNum <= 0 ||
+                !Number.isFinite(targetNum) || targetNum <= 0 ||
+                !Number.isFinite(pullbackPctNum) || pullbackPctNum < 0 ||
+                !Number.isFinite(trendPctNum) || trendPctNum < 0
+            ) {
+                setErrorMessage("Pullback signal parameters must be valid positive numbers.");
+                return;
+            }
+
+            params = {
+                lookbackMin: lookbackNum,
+                fastWindowMin: fastNum,
+                slowWindowMin: slowNum,
+                targetPct: targetNum,
+                pullbackTolerancePct: pullbackPctNum,
                 minTrendPct: trendPctNum,
             };
         } else {
@@ -429,6 +488,8 @@ export function PriceStrategyManager() {
                                     <option value="breakout_up">breakout_up</option>
                                     <option value="breakout_down">breakout_down</option>
                                     <option value="entry_long">entry_long</option>
+                                    <option value="entry_rebound">entry_rebound</option>
+                                    <option value="pullback_to_ma">pullback_to_ma</option>
                                 </select>
                             </div>
                         </div>
@@ -453,7 +514,7 @@ export function PriceStrategyManager() {
                                     <Input value={thresholdPct} onChange={(e) => setThresholdPct(e.target.value)} />
                                 </div>
                             </div>
-                        ) : strategyType === "entry_long" ? (
+                        ) : (strategyType === "entry_long" || strategyType === "entry_rebound" || strategyType === "pullback_to_ma") ? (
                             <div className="space-y-2">
                                 <div className="grid grid-cols-2 gap-2">
                                     <div>
@@ -477,12 +538,46 @@ export function PriceStrategyManager() {
                                 </div>
                                 <div className="grid grid-cols-2 gap-2">
                                     <div>
-                                        <label className="text-[11px] text-muted-foreground block mb-1">Breakout Tolerance (%)</label>
-                                        <Input value={breakoutTolerancePct} onChange={(e) => setBreakoutTolerancePct(e.target.value)} />
+                                        <label className="text-[11px] text-muted-foreground block mb-1">
+                                            {strategyType === "entry_long"
+                                                ? "Breakout Tolerance (%)"
+                                                : strategyType === "entry_rebound"
+                                                    ? "Min Rebound (%)"
+                                                    : "Pullback Tolerance (%)"}
+                                        </label>
+                                        <Input
+                                            value={strategyType === "entry_long"
+                                                ? breakoutTolerancePct
+                                                : strategyType === "entry_rebound"
+                                                    ? minReboundPct
+                                                    : pullbackTolerancePct}
+                                            onChange={(e) => strategyType === "entry_long"
+                                                ? setBreakoutTolerancePct(e.target.value)
+                                                : strategyType === "entry_rebound"
+                                                    ? setMinReboundPct(e.target.value)
+                                                    : setPullbackTolerancePct(e.target.value)}
+                                        />
                                     </div>
                                     <div>
-                                        <label className="text-[11px] text-muted-foreground block mb-1">Min Trend (%)</label>
-                                        <Input value={minTrendPct} onChange={(e) => setMinTrendPct(e.target.value)} />
+                                        <label className="text-[11px] text-muted-foreground block mb-1">
+                                            {strategyType === "entry_long"
+                                                ? "Min Trend (%)"
+                                                : strategyType === "entry_rebound"
+                                                    ? "Max Distance From Low (%)"
+                                                    : "Min Trend (%)"}
+                                        </label>
+                                        <Input
+                                            value={strategyType === "entry_long"
+                                                ? minTrendPct
+                                                : strategyType === "entry_rebound"
+                                                    ? maxDistanceFromLowPct
+                                                    : minTrendPct}
+                                            onChange={(e) => strategyType === "entry_long"
+                                                ? setMinTrendPct(e.target.value)
+                                                : strategyType === "entry_rebound"
+                                                    ? setMaxDistanceFromLowPct(e.target.value)
+                                                    : setMinTrendPct(e.target.value)}
+                                        />
                                     </div>
                                 </div>
                             </div>

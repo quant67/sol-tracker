@@ -16,8 +16,9 @@ Sol-Tracker (Sol Sniper) 是一个 **Solana 链上钱包监控工具**，核心�
 
 ## 2. 项目结构
 
-```
+``` 
 sol-tracker/
+├── backtest-optimize.ts             # 本地命令行历史优化 / smoke test 脚本
 ├── src/
 │   ├── app/
 │   │   ├── api/
@@ -27,6 +28,7 @@ sol-tracker/
 │   │   │   ├── logs/route.ts         # 交易日志 API
 │   │   │   ├── price-alerts/route.ts # 价格告警历史 API
 │   │   │   ├── price-backtest/route.ts # 信号回测 API
+│   │   │   ├── strategy-optimize/route.ts # 策略优化推荐 API
 │   │   │   ├── price-strategies/route.ts # 价格策略 CRUD API
 │   │   │   ├── people/route.ts       # 人员 CRUD API
 │   │   │   ├── stats/route.ts        # 统计数据 API
@@ -42,6 +44,7 @@ sol-tracker/
 │   │   │   ├── address-sidebar.tsx    # 左侧地址管理面板
 │   │   │   ├── dashboard-stats.tsx    # 统计卡片（API 轮询）
 │   │   │   ├── price-strategy-manager.tsx # 价格策略与监控代币管理面板
+│   │   │   ├── strategy-optimizer-panel.tsx # 历史回测优化推荐面板
 │   │   │   ├── strategy-backtest-panel.tsx # 信号回测面板
 │   │   │   ├── price-alert-history.tsx    # 价格告警历史面板
 │   │   │   └── recent-activity.tsx    # 交易记录表格（API 轮询）
@@ -50,9 +53,11 @@ sol-tracker/
 │   │   ├── auth.ts                   # 🔒 Token 签发/验证
 │   │   ├── supabase.ts               # Supabase 客户端（仅服务端）
 │   │   ├── backtest-engine.ts        # 信号历史回测核心
+│   │   ├── historical-price-provider.ts # 外部历史价格 provider + 缓存
 │   │   ├── helius-sync.ts            # Helius Webhook 同步逻辑
 │   │   ├── solana-parser.ts          # ⭐ 交易解析核心
 │   │   ├── strategy-engine.ts        # 价格行为策略判定核心
+│   │   ├── strategy-optimizer.ts     # 参数搜索、分段验证与推荐评分
 │   │   ├── telegram.ts              # Telegram 推送 + 消息格式化
 │   │   ├── token-resolver.ts         # Token 信息解析（名称/市值）
 │   │   ├── logger.ts                 # 文件日志
@@ -221,7 +226,14 @@ sequenceDiagram
    - `breakout_up` / `breakout_down`：判断是否上破/下破阈值
    - 命中后先做 `cooldown` 去重，再写入 `price_alert_events`
 
-3. **告警展示**
+3. **历史优化**
+   - `strategy-optimizer-panel.tsx` 手动发起外部历史研究
+   - `historical-price-provider.ts` 从 GeckoTerminal 拉取主 pool 的 OHLCV，并写入 `.cache/historical-price`
+   - `strategy-optimizer.ts` 对 `entry_long` / `entry_rebound` / `pullback_to_ma` 做参数搜索
+   - 搜索空间按 K 线根数定义，再换算成分钟窗口，避免 `15m/1h` 粒度下窗口过短导致零信号
+   - `POST /api/strategy-optimize` 返回推荐列表，前端可一键写入 `price_strategies`
+
+4. **告警展示**
    - 告警命中后通过 `telegram.ts` 发送消息
    - `Price Strategy Center` 负责管理 watch token 和策略
    - `Price Alert History` 负责展示触发记录
@@ -233,6 +245,7 @@ sequenceDiagram
 - [dashboard-stats.tsx](../src/components/dashboard/dashboard-stats.tsx) — 5 秒
 - [recent-activity.tsx](../src/components/dashboard/recent-activity.tsx) — 5 秒
 - [price-strategy-manager.tsx](../src/components/dashboard/price-strategy-manager.tsx) — 8 秒
+- [strategy-optimizer-panel.tsx](../src/components/dashboard/strategy-optimizer-panel.tsx) — 手动触发外部历史优化
 - [strategy-backtest-panel.tsx](../src/components/dashboard/strategy-backtest-panel.tsx) — 手动触发回测
 - [price-alert-history.tsx](../src/components/dashboard/price-alert-history.tsx) — 8 秒
 
@@ -309,17 +322,24 @@ erDiagram
 - `price_snapshots`：价格快照表，用于窗口计算和历史追踪
 - `price_alert_events`：告警历史表，用于 Dashboard 展示和去重
 
+> 新增的策略优化功能当前不写数据库研究表，而是使用外部历史数据 provider + 本地缓存的方式按需计算推荐结果。
+
 ---
 
 ## 5. 本次功能更新汇总
 
 - 新增价格监控进程 `scripts/price-monitor.ts`
+- 新增本地优化脚本 `backtest-optimize.ts`
 - 新增策略引擎 `src/lib/strategy-engine.ts`
 - 新增信号回测引擎 `src/lib/backtest-engine.ts`
+- 新增历史数据 provider `src/lib/historical-price-provider.ts`
+- 新增参数优化器 `src/lib/strategy-optimizer.ts`
 - 新增 Dashboard 页面 `Price Strategy Center` 和 `Price Alert History`
+- 新增 Dashboard `Strategy Optimizer` 面板
 - 新增 Dashboard `Signal Backtest` 面板
 - 新增 Telegram Bot 命令：watch token 管理、策略管理、策略测试
 - 新增回测 API `src/app/api/price-backtest/route.ts`
+- 新增优化 API `src/app/api/strategy-optimize/route.ts`
 - 新增数据库迁移 `supabase/migration-price-monitor.sql`
 - 新增 PM2 运行项 `sol-tracker-monitor`
 

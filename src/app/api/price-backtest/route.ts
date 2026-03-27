@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { normalizeStrategy } from '@/lib/strategy-engine';
-import { runEntryLongBacktest } from '@/lib/backtest-engine';
+import { runEntryStrategyBacktest } from '@/lib/backtest-engine';
 
 function extractRelation<T>(value: T | T[] | null | undefined): T | null {
     if (!value) return null;
@@ -43,8 +43,8 @@ export async function POST(req: NextRequest) {
         if (!strategy) {
             return NextResponse.json({ error: 'invalid strategy config' }, { status: 400 });
         }
-        if (strategy.type !== 'entry_long') {
-            return NextResponse.json({ error: 'backtest currently supports entry_long only' }, { status: 400 });
+        if (strategy.type !== 'entry_long' && strategy.type !== 'entry_rebound' && strategy.type !== 'pullback_to_ma') {
+            return NextResponse.json({ error: 'backtest currently supports entry_long, entry_rebound and pullback_to_ma only' }, { status: 400 });
         }
 
         const token = extractRelation<{ mint?: string; symbol?: string }>(rawStrategy.watch_tokens);
@@ -66,12 +66,12 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: snapshotError.message }, { status: 500 });
         }
 
-        const series = (snapshots || []).map((row: any) => ({
+        const series = (snapshots || []).map((row: { price: number | string; captured_at: string }) => ({
             price: Number(row.price),
             capturedAtMs: new Date(row.captured_at).getTime(),
         }));
 
-        const summary = runEntryLongBacktest(
+        const summary = runEntryStrategyBacktest(
             {
                 ...strategy,
                 params: {

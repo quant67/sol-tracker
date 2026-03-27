@@ -53,7 +53,9 @@ function formatPercent(value: number | null | undefined): string {
 function formatPrice(value: number): string {
     if (!Number.isFinite(value) || value <= 0) return "-";
     if (value >= 1) return `$${value.toFixed(6).replace(/0+$/, "").replace(/\.$/, "")}`;
-    return `$${value.toPrecision(6)}`;
+    if (value >= 0.01) return `$${value.toFixed(8).replace(/0+$/, "").replace(/\.$/, "")}`;
+    if (value >= 0.0001) return `$${value.toFixed(10).replace(/0+$/, "").replace(/\.$/, "")}`;
+    return `$${value.toPrecision(8)}`;
 }
 
 function getTokenMeta(strategy: StrategyOption): { mint: string; symbol: string } {
@@ -83,7 +85,10 @@ export function StrategyBacktestPanel() {
                 throw new Error(data?.error || "Failed to fetch strategies");
             }
             const data = await res.json();
-            const list = Array.isArray(data) ? data.filter((s: StrategyOption) => s.type === "entry_long") : [];
+            const list = Array.isArray(data)
+                ? data.filter((s: StrategyOption) =>
+                    s.type === "entry_long" || s.type === "entry_rebound" || s.type === "pullback_to_ma")
+                : [];
             setStrategies(list);
             if (!selectedStrategyId && list.length > 0) {
                 setSelectedStrategyId(list[0].id);
@@ -154,7 +159,7 @@ export function StrategyBacktestPanel() {
                     <div>
                         <h2 className="text-lg font-semibold text-foreground">Signal Backtest</h2>
                         <p className="text-xs text-muted-foreground mt-1">
-                            Validate whether entry setups tend to follow through by +10% or more.
+                            Validate whether continuation and rebound entry setups tend to follow through.
                         </p>
                     </div>
                 </div>

@@ -187,6 +187,42 @@ function buildPriceAlertMessage(
         }
     }
 
+    if (snapshot?.kind === 'entry_rebound') {
+        const reboundPct = toNumber(snapshot.reboundPct);
+        const targetPct = toNumber(snapshot.targetPct);
+        const fastMA = toNumber(snapshot.fastMA);
+        const slowMA = toNumber(snapshot.slowMA);
+        const drawdownFromHighPct = toNumber(snapshot.drawdownFromHighPct);
+
+        if (reboundPct !== null) lines.push(`<b>Rebound:</b> ${formatPct(reboundPct)}`);
+        if (drawdownFromHighPct !== null) lines.push(`<b>Off High:</b> ${formatPct(-drawdownFromHighPct)}`);
+        if (fastMA !== null && slowMA !== null) {
+            lines.push(`<b>MA:</b> ${formatPrice(fastMA)} / ${formatPrice(slowMA)}`);
+        }
+        if (targetPct !== null) {
+            lines.push(`<b>Target:</b> +${targetPct}% follow-through`);
+        }
+    }
+
+    if (snapshot?.kind === 'pullback_to_ma') {
+        const trendPct = toNumber(snapshot.trendPct);
+        const targetPct = toNumber(snapshot.targetPct);
+        const fastMA = toNumber(snapshot.fastMA);
+        const slowMA = toNumber(snapshot.slowMA);
+        const distanceFromHighPct = toNumber(snapshot.distanceFromHighPct);
+        const distanceToFastMAPct = toNumber(snapshot.distanceToFastMAPct);
+
+        if (trendPct !== null) lines.push(`<b>Trend:</b> ${formatPct(trendPct)}`);
+        if (distanceFromHighPct !== null) lines.push(`<b>Pullback:</b> ${formatPct(-distanceFromHighPct)}`);
+        if (distanceToFastMAPct !== null) lines.push(`<b>To Fast MA:</b> ${formatPct(distanceToFastMAPct)}`);
+        if (fastMA !== null && slowMA !== null) {
+            lines.push(`<b>MA:</b> ${formatPrice(fastMA)} / ${formatPrice(slowMA)}`);
+        }
+        if (targetPct !== null) {
+            lines.push(`<b>Target:</b> +${targetPct}% follow-through`);
+        }
+    }
+
     const dexLink = `<a href="https://dexscreener.com/solana/${token.mint}">DexScreener</a>`;
     const birdeyeLink = `<a href="https://birdeye.so/token/${token.mint}">Birdeye</a>`;
     lines.push(`🔗 ${dexLink} | ${birdeyeLink}`);

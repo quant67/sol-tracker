@@ -33,11 +33,15 @@ export interface BacktestSnapshot {
     capturedAtMs: number;
 }
 
-function toPct(value: number): number {
+function roundMetric(value: number): number {
     return Number(value.toFixed(3));
 }
 
-export function runEntryLongBacktest(
+function roundPrice(value: number): number {
+    return Number(value.toFixed(10));
+}
+
+export function runEntryStrategyBacktest(
     strategy: StrategyDefinition,
     tokenMint: string,
     snapshots: BacktestSnapshot[],
@@ -84,15 +88,15 @@ export function runEntryLongBacktest(
             }
         }
 
-        const maxFutureReturnPct = toPct(((maxFuturePrice - current.price) / current.price) * 100);
+        const maxFutureReturnPct = roundMetric(((maxFuturePrice - current.price) / current.price) * 100);
         const hit = hitAtMs !== null;
-        const minutesToHit = hitAtMs !== null ? toPct((hitAtMs - current.capturedAtMs) / 60000) : null;
+        const minutesToHit = hitAtMs !== null ? roundMetric((hitAtMs - current.capturedAtMs) / 60000) : null;
 
         samples.push({
             triggeredAt: new Date(current.capturedAtMs).toISOString(),
-            entryPrice: current.price,
-            targetPrice: toPct(targetPrice),
-            maxFuturePrice: toPct(maxFuturePrice),
+            entryPrice: roundPrice(current.price),
+            targetPrice: roundPrice(targetPrice),
+            maxFuturePrice: roundPrice(maxFuturePrice),
             maxFutureReturnPct,
             hit,
             minutesToHit,
@@ -105,10 +109,10 @@ export function runEntryLongBacktest(
     const hits = samples.filter((sample) => sample.hit).length;
     const skippedSignals = Math.max(actionableSignals - resolvedSignals, 0);
     const avgMaxReturnPct = resolvedSignals > 0
-        ? toPct(samples.reduce((sum, sample) => sum + sample.maxFutureReturnPct, 0) / resolvedSignals)
+        ? roundMetric(samples.reduce((sum, sample) => sum + sample.maxFutureReturnPct, 0) / resolvedSignals)
         : 0;
     const avgMinutesToHit = hits > 0
-        ? toPct(samples.filter((sample) => sample.hit).reduce((sum, sample) => sum + (sample.minutesToHit || 0), 0) / hits)
+        ? roundMetric(samples.filter((sample) => sample.hit).reduce((sum, sample) => sum + (sample.minutesToHit || 0), 0) / hits)
         : null;
 
     return {
@@ -123,7 +127,7 @@ export function runEntryLongBacktest(
         resolvedSignals,
         skippedSignals,
         hits,
-        hitRate: resolvedSignals > 0 ? toPct((hits / resolvedSignals) * 100) : 0,
+        hitRate: resolvedSignals > 0 ? roundMetric((hits / resolvedSignals) * 100) : 0,
         avgMaxReturnPct,
         avgMinutesToHit,
         samples,
