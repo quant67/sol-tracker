@@ -235,6 +235,7 @@ sequenceDiagram
    - `historical-price-provider.ts` 从 GeckoTerminal 拉取主 pool 的 OHLCV，并写入 `.cache/historical-price`
    - `strategy-optimizer.ts` 对 `entry_long` / `entry_rebound` / `failed_breakdown` / `pullback_to_ma` 做参数搜索
    - 搜索空间按 K 线根数定义，再换算成分钟窗口，避免 `15m/1h` 粒度下窗口过短导致零信号
+   - 优化评分已升级为“主窗口表现 + 多窗口稳定性 + 训练/验证分段”的综合口径，而不是只看单一 `lookahead`
    - `POST /api/strategy-optimize` 同时返回每种策略类型的最优参数和综合榜单，前端可单独应用或批量应用到 `price_strategies`
 
 4. **告警展示**

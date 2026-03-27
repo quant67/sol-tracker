@@ -172,23 +172,81 @@
 
 ### 4.3 评分方式
 
-当前评分综合考虑：
+优化器不再只看“单一主窗口 summary”。
 
-- `hitRate`
-- `avgMaxReturnPct`
+当前评分拆成两层：
+
+1. **主窗口表现**
+2. **多窗口稳定性**
+
+#### 主窗口表现
+
+主窗口仍然保留每个候选参数自己的 `lookaheadMin`，并优先观察：
+
 - `resolvedSignals`
+- `hitRate`
+- `avgMfePct`
+- `avgMaePct`
+- `avgEndReturnPct`
 - `avgMinutesToHit`
 
-并对低样本策略加惩罚：
+其中：
 
-- `resolvedSignals < 4` 重罚
-- `resolvedSignals < 8` 轻罚
+- `avgMfePct` 代表“信号后最多能走多远”
+- `avgMaePct` 代表“进场后平均要先承受多深回撤”
+- `avgEndReturnPct` 代表“如果机械持有到窗口结束，结果如何”
 
-此外实现了一个轻量版稳定性检查：
+#### 多窗口稳定性
 
-- 先把历史数据切分成训练段和验证段
-- 对训练 / 验证 / 全量分别计算得分
-- 最终得分会扣除一定的稳定性惩罚，避免完全靠单一时段过拟合
+每个候选参数除了主窗口，还会按策略类型自动带出一组默认窗口：
+
+- `failed_breakdown`
+  - `60 / 120 / 180 / 240`
+- `entry_rebound`
+  - `120 / 180 / 240 / 360`
+- `pullback_to_ma`
+  - `120 / 180 / 240 / 360`
+- `entry_long`
+  - `90 / 180 / 240 / 360`
+
+系统会把候选参数的主窗口自动并入这组窗口，形成完整的 `windowMetrics`。
+
+多窗口稳定性重点回答：
+
+- 这组参数是否只在一个窗口里好看
+- 拉长或缩短观察窗口后，表现是否大幅失真
+- `hitRate / avgEndReturnPct / avgMaePct` 是否在相邻窗口上仍然可接受
+
+最终每个候选都会额外得到一组稳定性信息，例如：
+
+- `qualifiedWindows`
+- `totalWindows`
+- `coveragePct`
+- `scoreRange`
+- `hitRateRange`
+- `stabilityScore`
+
+#### 最终综合分
+
+最终分数由三部分共同决定：
+
+1. 全量数据的“主窗口 + 多窗口”综合分
+2. 训练段的综合分
+3. 验证段的综合分
+
+并额外扣除：
+
+- 低样本惩罚
+- 多窗口离散度惩罚
+- 训练 / 验证明显掉档的稳定性惩罚
+
+因此当前优化器更偏向选出：
+
+- 主窗口表现不错
+- 相邻窗口不崩
+- 验证段没有明显塌陷
+
+而不是只在一个 `lookaheadMin` 上恰好刷出最高命中率的参数。
 
 ---
 
@@ -202,14 +260,14 @@
 4. 看推荐列表里：
    - 样本数是否足够
    - 命中率是否合理
-   - 平均最大收益是否有交易价值
+   - `avgMfePct / avgEndReturnPct / avgMaePct` 是否还有交易价值
 
 ### 5.2 选择策略时
 
 建议优先选：
 
 - `resolvedSignals` 足够
-- `hitRate` 与 `avgMaxReturnPct` 平衡
+- `hitRate`、`avgEndReturnPct`、`avgMaePct` 平衡
 - 分数高且不是极端参数的那组
 
 不要单纯追求：

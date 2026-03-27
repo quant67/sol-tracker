@@ -27,8 +27,34 @@ interface Recommendation {
         hits: number;
         hitRate: number;
         avgMaxReturnPct: number;
+        avgMfePct: number;
+        avgMaePct: number;
+        avgEndReturnPct: number;
         avgMinutesToHit: number | null;
         skippedSignals: number;
+    };
+    windowMetrics: {
+        lookaheadMin: number;
+        resolvedSignals: number;
+        skippedSignals: number;
+        hits: number;
+        hitRate: number;
+        avgMfePct: number;
+        avgMaePct: number;
+        avgEndReturnPct: number;
+        avgMinutesToHit: number | null;
+        windowScore: number;
+    }[];
+    stability: {
+        primaryScore: number;
+        windowScore: number;
+        stabilityScore: number;
+        qualifiedWindows: number;
+        totalWindows: number;
+        coveragePct: number;
+        scoreRange: number;
+        hitRateRange: number;
+        endReturnRange: number;
     };
 }
 
@@ -78,6 +104,38 @@ function getStrategyTypeLabel(strategyType: string): string {
 
 function getRecommendationKey(recommendation: Recommendation): string {
     return `${recommendation.strategyType}-${recommendation.lookaheadMin}-${JSON.stringify(recommendation.params)}`;
+}
+
+function RecommendationWindows({ recommendation }: { recommendation: Recommendation }) {
+    if (!recommendation.windowMetrics.length) return null;
+
+    return (
+        <div className="space-y-2">
+            <div className="flex items-center justify-between gap-3">
+                <div className="text-[11px] text-muted-foreground">Window Stability</div>
+                <div className="text-[11px] text-muted-foreground">
+                    coverage {recommendation.stability.qualifiedWindows}/{recommendation.stability.totalWindows}
+                    {" · "}
+                    stable {recommendation.stability.stabilityScore.toFixed(2)}
+                </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2">
+                {recommendation.windowMetrics.map((metric) => (
+                    <div key={`${recommendation.strategyType}-${metric.lookaheadMin}`} className="rounded-md border border-border/60 bg-background/40 p-2">
+                        <div className="flex items-center justify-between gap-2 text-[11px]">
+                            <span className="font-semibold text-foreground">{metric.lookaheadMin}m</span>
+                            <span className="text-muted-foreground">S {metric.windowScore.toFixed(1)}</span>
+                        </div>
+                        <div className="mt-1 space-y-1 text-[11px] text-muted-foreground">
+                            <div>Hit {formatPercent(metric.hitRate)}</div>
+                            <div>End {formatPercent(metric.avgEndReturnPct)}</div>
+                            <div>MAE {formatPercent(metric.avgMaePct)}</div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
 }
 
 export function StrategyOptimizerPanel() {
@@ -429,14 +487,28 @@ export function StrategyOptimizerPanel() {
                                                             <div className="font-semibold text-foreground">{formatPercent(recommendation.metrics.hitRate)}</div>
                                                         </div>
                                                         <div>
-                                                            <div className="text-muted-foreground">Avg Max Return</div>
-                                                            <div className="font-semibold text-foreground">{formatPercent(recommendation.metrics.avgMaxReturnPct)}</div>
+                                                            <div className="text-muted-foreground">Avg End Return</div>
+                                                            <div className="font-semibold text-foreground">{formatPercent(recommendation.metrics.avgEndReturnPct)}</div>
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-muted-foreground">Avg MFE</div>
+                                                            <div className="font-semibold text-foreground">{formatPercent(recommendation.metrics.avgMfePct)}</div>
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-muted-foreground">Avg MAE</div>
+                                                            <div className="font-semibold text-foreground">{formatPercent(recommendation.metrics.avgMaePct)}</div>
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-muted-foreground">Stable Score</div>
+                                                            <div className="font-semibold text-foreground">{recommendation.stability.stabilityScore.toFixed(2)}</div>
                                                         </div>
                                                     </div>
 
                                                     <div className="rounded-md border border-border/60 bg-background/40 p-3 text-xs font-mono text-foreground/90 break-all">
                                                         {JSON.stringify(recommendation.params)}
                                                     </div>
+
+                                                    <RecommendationWindows recommendation={recommendation} />
 
                                                     <div className="flex justify-end">
                                                         <Button
@@ -486,7 +558,7 @@ export function StrategyOptimizerPanel() {
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-xs">
+                                    <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3 text-xs">
                                         <div>
                                             <div className="text-muted-foreground">Lookahead</div>
                                             <div className="font-semibold text-foreground">{recommendation.lookaheadMin}m</div>
@@ -500,8 +572,16 @@ export function StrategyOptimizerPanel() {
                                             <div className="font-semibold text-foreground">{formatPercent(recommendation.metrics.hitRate)}</div>
                                         </div>
                                         <div>
-                                            <div className="text-muted-foreground">Avg Max Return</div>
-                                            <div className="font-semibold text-foreground">{formatPercent(recommendation.metrics.avgMaxReturnPct)}</div>
+                                            <div className="text-muted-foreground">Avg MFE</div>
+                                            <div className="font-semibold text-foreground">{formatPercent(recommendation.metrics.avgMfePct)}</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-muted-foreground">Avg MAE</div>
+                                            <div className="font-semibold text-foreground">{formatPercent(recommendation.metrics.avgMaePct)}</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-muted-foreground">Avg End</div>
+                                            <div className="font-semibold text-foreground">{formatPercent(recommendation.metrics.avgEndReturnPct)}</div>
                                         </div>
                                         <div>
                                             <div className="text-muted-foreground">Avg Minutes</div>
@@ -509,11 +589,17 @@ export function StrategyOptimizerPanel() {
                                                 {recommendation.metrics.avgMinutesToHit === null ? "-" : `${recommendation.metrics.avgMinutesToHit.toFixed(2)}m`}
                                             </div>
                                         </div>
+                                        <div>
+                                            <div className="text-muted-foreground">Stable Score</div>
+                                            <div className="font-semibold text-foreground">{recommendation.stability.stabilityScore.toFixed(2)}</div>
+                                        </div>
                                     </div>
 
                                     <div className="rounded-md border border-border/60 bg-background/40 p-3 text-xs font-mono text-foreground/90 break-all">
                                         {JSON.stringify(recommendation.params)}
                                     </div>
+
+                                    <RecommendationWindows recommendation={recommendation} />
 
                                     <div className="flex justify-end">
                                         <Button

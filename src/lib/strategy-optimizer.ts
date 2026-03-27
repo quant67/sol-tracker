@@ -1,4 +1,4 @@
-import { runEntryStrategyBacktest } from './backtest-engine';
+import { getDefaultBacktestWindows, runEntryStrategyBacktest, type BacktestWindowMetric } from './backtest-engine';
 import type { HistoricalInterval, HistoricalPricePoint, HistoricalSeriesResult } from './historical-price-provider';
 import type { StrategyDefinition, StrategyType } from './strategy-engine';
 
@@ -26,9 +26,14 @@ export interface StrategyRecommendation {
         hits: number;
         hitRate: number;
         avgMaxReturnPct: number;
+        avgMfePct: number;
+        avgMaePct: number;
+        avgEndReturnPct: number;
         avgMinutesToHit: number | null;
         skippedSignals: number;
     };
+    windowMetrics: RecommendationWindowMetric[];
+    stability: RecommendationStability;
 }
 
 export interface OptimizationResult {
@@ -57,12 +62,37 @@ type CandidateDefinition = {
 
 type CandidateMetrics = StrategyRecommendation['metrics'];
 
+export interface RecommendationWindowMetric extends BacktestWindowMetric {
+    windowScore: number;
+}
+
+export interface RecommendationStability {
+    primaryScore: number;
+    windowScore: number;
+    stabilityScore: number;
+    qualifiedWindows: number;
+    totalWindows: number;
+    coveragePct: number;
+    scoreRange: number;
+    hitRateRange: number;
+    endReturnRange: number;
+}
+
 type CandidateScore = {
     strategyType: StrategyType;
     params: Record<string, unknown>;
     lookaheadMin: number;
     score: number;
     metrics: CandidateMetrics;
+    windowMetrics: RecommendationWindowMetric[];
+    stability: RecommendationStability;
+};
+
+type CandidateEvaluation = {
+    metrics: CandidateMetrics;
+    windowMetrics: RecommendationWindowMetric[];
+    stability: RecommendationStability;
+    compositeScore: number;
 };
 
 type WindowCombo = {
@@ -84,26 +114,99 @@ function metricsFromSummary(summary: ReturnType<typeof runEntryStrategyBacktest>
         hits: summary.hits,
         hitRate: summary.hitRate,
         avgMaxReturnPct: summary.avgMaxReturnPct,
+        avgMfePct: summary.avgMfePct,
+        avgMaePct: summary.avgMaePct,
+        avgEndReturnPct: summary.avgEndReturnPct,
         avgMinutesToHit: summary.avgMinutesToHit,
         skippedSignals: summary.skippedSignals,
     };
 }
 
-function scoreMetrics(metrics: CandidateMetrics): number {
-    const samplePenalty = metrics.resolvedSignals < 4 ? -100 : 0;
-    const sparsityPenalty = metrics.resolvedSignals < 8 ? -12 : 0;
+function average(values: number[]): number {
+    if (values.length === 0) return 0;
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function range(values: number[]): number {
+    if (values.length <= 1) return 0;
+    return Math.max(...values) - Math.min(...values);
+}
+
+function scoreMetrics(
+    metrics: Pick<CandidateMetrics, 'resolvedSignals' | 'hitRate' | 'avgMfePct' | 'avgMaePct' | 'avgEndReturnPct' | 'avgMinutesToHit'>,
+    mode: 'primary' | 'window'
+): number {
+    const samplePenalty = metrics.resolvedSignals < 4
+        ? mode === 'primary' ? -100 : -18
+        : 0;
+    const sparsityPenalty = metrics.resolvedSignals < 8
+        ? mode === 'primary' ? -10 : -5
+        : 0;
     const speedBonus = metrics.avgMinutesToHit === null
         ? 0
-        : Math.max(0, 120 - metrics.avgMinutesToHit) * 0.04;
+        : Math.max(0, 180 - metrics.avgMinutesToHit) * 0.03;
 
     return Number((
-        metrics.hitRate * 0.42 +
-        metrics.avgMaxReturnPct * 0.34 +
-        Math.min(metrics.resolvedSignals, 24) * 0.9 +
+        metrics.hitRate * 0.26 +
+        metrics.avgMfePct * 0.2 +
+        metrics.avgEndReturnPct * 0.32 +
+        metrics.avgMaePct * 0.14 +
+        Math.min(metrics.resolvedSignals, 24) * 0.85 +
         speedBonus +
         samplePenalty +
         sparsityPenalty
     ).toFixed(3));
+}
+
+function buildWindowMetrics(summary: ReturnType<typeof runEntryStrategyBacktest>): RecommendationWindowMetric[] {
+    return summary.windowMetrics.map((metric) => ({
+        ...metric,
+        windowScore: scoreMetrics(metric, 'window'),
+    }));
+}
+
+function buildStability(
+    windowMetrics: RecommendationWindowMetric[],
+    primaryScore: number
+): RecommendationStability {
+    const qualifiedWindows = windowMetrics.filter((metric) => metric.resolvedSignals >= 4);
+    const scoringWindows = qualifiedWindows.length > 0 ? qualifiedWindows : windowMetrics;
+    const coveragePct = windowMetrics.length > 0
+        ? Number(((qualifiedWindows.length / windowMetrics.length) * 100).toFixed(3))
+        : 0;
+    const scoreRange = Number(range(scoringWindows.map((metric) => metric.windowScore)).toFixed(3));
+    const hitRateRange = Number(range(scoringWindows.map((metric) => metric.hitRate)).toFixed(3));
+    const endReturnRange = Number(range(scoringWindows.map((metric) => metric.avgEndReturnPct)).toFixed(3));
+    const averagedWindowScore = Number(average(scoringWindows.map((metric) => metric.windowScore)).toFixed(3));
+    const coverageBonus = coveragePct * 0.08;
+    const consistencyPenalty = scoreRange * 0.18 + hitRateRange * 0.04 + endReturnRange * 0.5;
+    const normalizedPrimaryScore = Number(primaryScore.toFixed(3));
+
+    return {
+        primaryScore: normalizedPrimaryScore,
+        windowScore: averagedWindowScore,
+        stabilityScore: Number((averagedWindowScore + coverageBonus - consistencyPenalty).toFixed(3)),
+        qualifiedWindows: qualifiedWindows.length,
+        totalWindows: windowMetrics.length,
+        coveragePct,
+        scoreRange,
+        hitRateRange,
+        endReturnRange,
+    };
+}
+
+function evaluateSummary(summary: ReturnType<typeof runEntryStrategyBacktest>): CandidateEvaluation {
+    const metrics = metricsFromSummary(summary);
+    const primaryScore = scoreMetrics(metrics, 'primary');
+    const windowMetrics = buildWindowMetrics(summary);
+    const stability = buildStability(windowMetrics, primaryScore);
+
+    return {
+        metrics,
+        windowMetrics,
+        stability,
+        compositeScore: Number((primaryScore * 0.6 + stability.stabilityScore * 0.4).toFixed(3)),
+    };
 }
 
 function getIntervalMinutes(interval: HistoricalInterval): number {
@@ -342,28 +445,34 @@ function splitSeries(points: HistoricalPricePoint[]): { train: HistoricalPricePo
 }
 
 function evaluateCandidate(candidate: CandidateDefinition, mint: string, points: HistoricalPricePoint[]): CandidateScore {
-    const fullMetrics = metricsFromSummary(runEntryStrategyBacktest(candidate.strategy, mint, points, candidate.lookaheadMin));
+    const windowMinutes = getDefaultBacktestWindows(candidate.strategy.type, candidate.lookaheadMin);
+    const fullEvaluation = evaluateSummary(
+        runEntryStrategyBacktest(candidate.strategy, mint, points, candidate.lookaheadMin, windowMinutes)
+    );
     const { train, validation } = splitSeries(points);
-    const trainMetrics = train.length >= 20
-        ? metricsFromSummary(runEntryStrategyBacktest(candidate.strategy, mint, train, candidate.lookaheadMin))
+    const trainEvaluation = train.length >= 20
+        ? evaluateSummary(runEntryStrategyBacktest(candidate.strategy, mint, train, candidate.lookaheadMin, windowMinutes))
         : null;
-    const validationMetrics = validation.length >= 20
-        ? metricsFromSummary(runEntryStrategyBacktest(candidate.strategy, mint, validation, candidate.lookaheadMin))
+    const validationEvaluation = validation.length >= 20
+        ? evaluateSummary(runEntryStrategyBacktest(candidate.strategy, mint, validation, candidate.lookaheadMin, windowMinutes))
         : null;
 
-    const fullScore = scoreMetrics(fullMetrics);
-    const trainScore = trainMetrics ? scoreMetrics(trainMetrics) : 0;
-    const validationScore = validationMetrics ? scoreMetrics(validationMetrics) : 0;
-    const stabilityPenalty = validationMetrics && validationMetrics.resolvedSignals > 0
-        ? Math.max(0, fullMetrics.hitRate - validationMetrics.hitRate) * 0.08
+    const fullScore = fullEvaluation.compositeScore;
+    const trainScore = trainEvaluation ? trainEvaluation.compositeScore : 0;
+    const validationScore = validationEvaluation ? validationEvaluation.compositeScore : 0;
+    const stabilityPenalty = validationEvaluation && validationEvaluation.metrics.resolvedSignals > 0
+        ? Math.max(0, fullEvaluation.metrics.hitRate - validationEvaluation.metrics.hitRate) * 0.08
+            + Math.max(0, fullEvaluation.stability.stabilityScore - validationEvaluation.stability.stabilityScore) * 0.35
         : 4;
 
     return {
         strategyType: candidate.strategy.type,
         params: candidate.strategy.params,
         lookaheadMin: candidate.lookaheadMin,
-        metrics: fullMetrics,
-        score: Number((fullScore * 0.45 + validationScore * 0.4 + trainScore * 0.15 - stabilityPenalty).toFixed(3)),
+        metrics: fullEvaluation.metrics,
+        windowMetrics: fullEvaluation.windowMetrics,
+        stability: fullEvaluation.stability,
+        score: Number((fullScore * 0.45 + validationScore * 0.35 + trainScore * 0.2 - stabilityPenalty).toFixed(3)),
     };
 }
 
@@ -376,13 +485,17 @@ function toRecommendation(candidate: CandidateScore, index: number, style: Optim
         score: candidate.score,
         style,
         metrics: candidate.metrics,
+        windowMetrics: candidate.windowMetrics,
+        stability: candidate.stability,
     };
 }
 
 function sortCandidates(left: CandidateScore, right: CandidateScore): number {
     return right.score - left.score
+        || right.stability.stabilityScore - left.stability.stabilityScore
         || right.metrics.resolvedSignals - left.metrics.resolvedSignals
         || right.metrics.hitRate - left.metrics.hitRate
+        || right.metrics.avgEndReturnPct - left.metrics.avgEndReturnPct
         || right.metrics.avgMaxReturnPct - left.metrics.avgMaxReturnPct;
 }
 
