@@ -71,6 +71,24 @@
 - progress message
 - 完成后的 token 信息与优化结果
 
+### 2.3 异步执行链路
+
+当前优化器已经从“同步 HTTP 直接计算”升级为：
+
+1. 前端点击 `Optimize Strategy`
+2. `POST /api/strategy-optimize/jobs` 创建任务
+3. `sol-tracker-optimizer-worker` 顺序处理任务
+4. Worker 拉历史数据并执行优化
+5. Worker 把结果写回 job
+6. 前端轮询 `GET /api/strategy-optimize/jobs/:id`
+7. 完成后展示推荐结果
+
+保留这个异步形态的核心原因是：
+
+- 避免重计算长时间占用主 Web 进程
+- 避免把 `stats / logs / watch-tokens / price-strategies` 一起拖慢
+- 方便后续做队列、重试、历史记录和去重
+
 ---
 
 ## 3. 历史数据方案
@@ -320,30 +338,85 @@ node --import tsx /Users/sixseven/dev/ai-coding/sol-tracker/backtest-optimize.ts
 
 当前版本有意保持轻量：
 
-- 不新增研究结果数据库表
+- 不单独新增研究结果历史表
 - 不自动覆盖已有策略
 - 不自动定时重优化
 - 不做多 provider 自动切换
 - 文件缓存写失败时自动降级为“仅本次内存执行”，不会因为部署环境只读而直接让优化失败
 
-### 6.1 异步任务化
-
-当前优化器已经从“同步 HTTP 直接计算”升级为：
-
-- Web API 负责创建 optimization job
-- `sol-tracker-optimizer-worker` 负责顺序执行任务
-- Dashboard 轮询 job 状态并展示结果
-
-这样可以避免优化任务长时间占用主 Web 进程，拖慢 `stats / logs / watch-tokens` 等普通接口。
-
 也就是说：
 
-- 它现在是一个“**按需研究并推荐**”系统
+- 它现在是一个“**异步按需研究并推荐**”系统
 - 而不是一个“自动改参数的黑盒系统”
+
+### 6.1 Job 数据模型
+
+当前通过 `strategy_optimization_jobs` 表持久化：
+
+- 请求参数
+- 当前状态
+- progress message
+- provider / pool 信息
+- 完成后的优化结果
+- 错误信息
+
+这样即使 Worker 重启，任务状态仍然可追踪。
+
+### 6.2 并发策略
+
+当前建议只跑：
+
+- **1 个 `sol-tracker-optimizer-worker`**
+
+并保持：
+
+- 一次只处理 1 个 job
+- GeckoTerminal 请求顺序节流
+
+这样可以避免：
+
+- 外部 provider `429`
+- 多个优化任务同时抢 CPU
+- Dashboard 因后台重任务再次出现抖动
+
+### 6.3 同步入口的角色
+
+旧的同步入口 `POST /api/strategy-optimize` 目前仅保留为兼容 / 调试入口。
+
+正式前端链路已切换到：
+
+- `POST /api/strategy-optimize/jobs`
+- `GET /api/strategy-optimize/jobs/:id`
 
 ---
 
-## 7. 后续可继续演进的方向
+## 7. 上线复盘
+
+这轮优化器演进里，一个重要经验是：
+
+- **只要任务同时具备 CPU 密集 + 外部请求 + 单次可能超过几秒，就不应该继续放在主 Web 请求里同步执行。**
+
+本项目曾出现过：
+
+- `POST /api/strategy-optimize` 超时
+- 同时把 `stats / logs / watch-tokens / price-strategies` 一起拖成 `504`
+
+根因不是普通业务 bug，而是：
+
+- 单实例 Web 进程被重计算任务阻塞
+- Nginx upstream 等不到响应头
+- Dashboard 高频轮询接口被连带饿死
+
+因此当前架构调整为：
+
+- Web 负责“提交任务 / 查状态”
+- Worker 负责“拉历史 / 优化 / 写结果”
+
+后续新增类似能力时，也应优先遵循这个原则。
+
+---
+
+## 8. 后续可继续演进的方向
 
 下一阶段建议优先做：
 

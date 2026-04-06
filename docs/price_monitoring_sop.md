@@ -1,6 +1,6 @@
-# 价格行为监控功能上线与验收指南
+# 价格行为监控与入场信号验收指南
 
-本文用于验证 Sol-Tracker 的“代币价格行为监控 + Telegram 推送”功能是否在部署后正常工作。
+本文用于验证 Sol-Tracker 的“代币价格行为监控 + Telegram 推送 + 入场信号回测/实盘提醒”功能是否在部署后正常工作。
 
 ## 1. 功能范围
 
@@ -17,6 +17,10 @@
 - `pct_change_down`
 - `breakout_up`
 - `breakout_down`
+- `entry_long`
+- `entry_rebound`
+- `failed_breakdown`
+- `pullback_to_ma`
 
 ## 2. 部署前检查
 
@@ -264,7 +268,79 @@ pm2 logs sol-tracker-monitor
 6. 等待真实行情触发
 7. 检查 Dashboard 历史和数据库记录
 
-## 9. 相关文件
+## 9. 专项测试：`entry_long`
+
+如果希望单独验证上涨延续入场信号，可按下面顺序做专项测试。
+
+### 9.1 测试目标
+
+重点不是“价格涨了就提醒”，而是验证：
+
+- 趋势转强 / 结构延续 / 接近突破位时是否能提醒
+- 回测面板是否能展示这类信号的历史表现
+- Telegram 提醒链路是否能解释“为什么这里是入场点”
+
+### 9.2 创建入场策略
+
+推荐命令：
+
+```text
+/strategyadd <mint> entry_long <lookbackMin> <fastWindowMin> <slowWindowMin> <targetPct> [cooldownSec] [breakoutTolerancePct] [minTrendPct]
+```
+
+建议先用一组便于测试的参数：
+
+```text
+/strategyadd <mint> entry_long 30 5 15 10 300 1.5 2
+```
+
+### 9.3 先跑回测
+
+打开首页 `Signal Backtest` 面板：
+
+1. 选择刚创建的 `entry_long`
+2. `Lookahead (min)` 先用 `120`
+3. `History (days)` 先用 `30`
+4. 点击 `Run Backtest`
+
+重点看：
+
+- `Actionable Signals`
+- `Resolved / Hits`
+- `Hit Rate`
+- `Avg Max Return`
+- `Avg Minutes to Target`
+
+### 9.4 再看实时提醒
+
+回测结果合理后，再观察：
+
+```bash
+pm2 logs sol-tracker-monitor
+```
+
+你应该能在真实触发时看到：
+
+- 策略评估成功
+- `Price alert sent`
+- Telegram 提醒内容包含趋势 / 触发原因 / 目标信息
+
+### 9.5 Dashboard 核对
+
+按这个顺序检查：
+
+1. `Price Strategy Center`
+2. `Signal Backtest`
+3. `Price Alert History`
+
+重点核对：
+
+- 参数是否正确
+- 回测结果是否合理
+- 实际触发是否落库
+- 告警内容是否可解释
+
+## 10. 相关文件
 
 - [Telegram Bot 脚本](/Users/sixseven/dev/ai-coding/sol-tracker/scripts/tg-bot.ts)
 - [价格监控脚本](/Users/sixseven/dev/ai-coding/sol-tracker/scripts/price-monitor.ts)

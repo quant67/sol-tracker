@@ -12,6 +12,25 @@ Sol-Tracker (Sol Sniper) 是一个 **Solana 链上钱包监控工具**，核心�
 
 > 这份文档聚焦系统全貌和运维视角。实现细节优先看对应源码文件，避免文档与代码重复膨胀。
 
+## 文档导航
+
+如果只想快速进入当前有效文档，建议优先看这几份：
+
+- `/Users/sixseven/dev/ai-coding/sol-tracker/docs/technical_doc.md`
+  - 项目总览、架构、部署形态
+- `/Users/sixseven/dev/ai-coding/sol-tracker/docs/signal_trigger_rules.md`
+  - 当前已实现策略规则
+- `/Users/sixseven/dev/ai-coding/sol-tracker/docs/strategy_optimizer_workflow.md`
+  - 优化器工作流、异步 job、上线复盘
+- `/Users/sixseven/dev/ai-coding/sol-tracker/docs/price_monitoring_sop.md`
+  - 监控与入场信号验收指南
+
+研究型补充文档保留为：
+
+- `/Users/sixseven/dev/ai-coding/sol-tracker/docs/bottom_signal_research.md`
+- `/Users/sixseven/dev/ai-coding/sol-tracker/docs/backtest_metrics_upgrade.md`
+- `/Users/sixseven/dev/ai-coding/sol-tracker/docs/tg_bot_doc.md`
+
 ---
 
 ## 2. 项目结构
