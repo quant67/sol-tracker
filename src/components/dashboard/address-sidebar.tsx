@@ -173,14 +173,14 @@ export function AddressSidebar() {
     return (
         <div className="flex flex-col h-full">
             {/* Sub-header: count + add person */}
-            <div className="px-4 py-2 flex items-center justify-between">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <div className="px-4 py-3 flex items-center justify-between">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                     Monitors · {totalActive}/{totalAddrs}
                 </span>
                 <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 text-muted-foreground hover:text-indigo-400 hover:bg-indigo-500/10"
+                    className="h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/10"
                     onClick={() => setShowAddPerson(!showAddPerson)}
                     title="Add person"
                 >
@@ -190,15 +190,15 @@ export function AddressSidebar() {
 
             {/* Add Person Form */}
             {showAddPerson && (
-                <form onSubmit={handleAddPerson} className="p-3 border-b border-border bg-muted/20 flex gap-2">
+                <form onSubmit={handleAddPerson} className="flex gap-2 border-b border-border/60 bg-background/25 p-3">
                     <Input
                         placeholder="Person name..."
                         value={newPersonName}
                         onChange={(e) => setNewPersonName(e.target.value)}
-                        className="bg-background border-border/50 h-8 text-xs shadow-none"
+                        className="h-8 rounded-lg bg-background/70 text-xs shadow-none"
                         autoFocus
                     />
-                    <Button type="submit" disabled={isAddingPerson} size="sm" className="h-8 bg-indigo-600 hover:bg-indigo-700 text-xs px-3 shrink-0">
+                    <Button type="submit" disabled={isAddingPerson} size="sm" className="h-8 px-3 text-xs shrink-0">
                         {isAddingPerson ? <Loader2 className="w-3 h-3 animate-spin" /> : "Add"}
                     </Button>
                 </form>
@@ -223,7 +223,7 @@ export function AddressSidebar() {
                         return (
                             <div key={person.id} className="border-b border-border/40">
                                 {/* Person Row */}
-                                <div className="group flex items-center gap-1 px-3 py-2.5 hover:bg-muted/40 transition-colors cursor-pointer"
+                                <div className="group flex cursor-pointer items-center gap-1 px-3 py-3 hover:bg-accent/35 transition-colors"
                                     onClick={() => toggleExpand(person.id)}>
                                     <span className="text-muted-foreground">
                                         {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
@@ -266,9 +266,9 @@ export function AddressSidebar() {
 
                                 {/* Expanded: Addresses */}
                                 {isExpanded && (
-                                    <div className="bg-muted/10">
+                                    <div className="bg-background/20">
                                         {person.addresses.map(addr => (
-                                            <div key={addr.id} className={`group/addr flex items-center gap-2 pl-8 pr-3 py-2 hover:bg-muted/30 transition-colors ${!addr.is_active ? 'opacity-40' : ''}`}>
+                                            <div key={addr.id} className={`group/addr flex items-center gap-2 pl-8 pr-3 py-2.5 hover:bg-accent/25 transition-colors ${!addr.is_active ? 'opacity-40' : ''}`}>
                                                 <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${addr.is_active ? 'bg-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.5)]' : 'bg-zinc-500'}`}></div>
 
                                                 {editingAddrId === addr.id ? (
@@ -308,11 +308,11 @@ export function AddressSidebar() {
                                         {addingAddrForPerson === person.id ? (
                                             <form onSubmit={(e) => handleAddAddr(e, person.id)} className="pl-8 pr-3 py-2 space-y-1.5">
                                                 <Input placeholder="Solana address..." value={newAddr} onChange={e => setNewAddr(e.target.value)}
-                                                    className="bg-background border-border/50 h-7 text-[11px] shadow-none" autoFocus />
+                                                    className="h-7 rounded-lg bg-background/70 text-[11px] shadow-none" autoFocus />
                                                 <div className="flex gap-1.5">
                                                     <Input placeholder="Note (optional)" value={newAddrLabel} onChange={e => setNewAddrLabel(e.target.value)}
-                                                        className="bg-background border-border/50 h-7 text-[11px] shadow-none" />
-                                                    <Button type="submit" disabled={isAddingAddr} size="sm" className="h-7 bg-indigo-600 hover:bg-indigo-700 text-[11px] px-2.5">
+                                                        className="h-7 rounded-lg bg-background/70 text-[11px] shadow-none" />
+                                                    <Button type="submit" disabled={isAddingAddr} size="sm" className="h-7 px-2.5 text-[11px]">
                                                         {isAddingAddr ? <Loader2 className="w-3 h-3 animate-spin" /> : "Add"}
                                                     </Button>
                                                     <Button type="button" variant="ghost" size="sm" className="h-7 text-[11px] px-2"
@@ -323,7 +323,7 @@ export function AddressSidebar() {
                                             </form>
                                         ) : (
                                             <button
-                                                className="w-full pl-8 pr-3 py-2 text-[11px] text-muted-foreground hover:text-indigo-400 hover:bg-muted/30 transition-colors flex items-center gap-1.5"
+                                                className="flex w-full items-center gap-1.5 py-2 pl-8 pr-3 text-[11px] text-muted-foreground transition-colors hover:bg-accent/25 hover:text-primary"
                                                 onClick={() => { setAddingAddrForPerson(person.id); setNewAddr(""); setNewAddrLabel(""); }}
                                             >
                                                 <Wallet className="w-3 h-3" /> Add address

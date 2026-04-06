@@ -61,18 +61,26 @@ export function RecentActivity() {
     };
 
     return (
-        <div className="bg-card border border-border rounded-2xl overflow-hidden transition-colors shadow-none">
-            <div className="px-6 py-4 border-b border-border bg-muted/30 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <Zap className="w-5 h-5 text-amber-500" />
-                    <h2 className="text-lg font-semibold text-foreground">Recent Signals</h2>
+        <section className="overflow-hidden rounded-[1.9rem] border border-border/70 bg-card/86 shadow-[inset_0_1px_0_color-mix(in_oklab,var(--color-foreground)_4%,transparent),0_24px_80px_-46px_rgba(0,0,0,0.95)] transition-colors">
+            <div className="flex items-start justify-between gap-4 border-b border-border/70 bg-[linear-gradient(145deg,color-mix(in_oklab,var(--color-card)_94%,transparent),color-mix(in_oklab,var(--color-primary)_7%,transparent))] px-6 py-5">
+                <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary/80">Live Feed</div>
+                    <div className="mt-2 flex items-center gap-3">
+                        <Zap className="h-5 w-5 text-primary" />
+                        <h2 className="text-2xl font-semibold tracking-[-0.03em] text-foreground">Recent Signals</h2>
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                        Scan the most recent wallet actions and judge whether the flow deserves follow-up.
+                    </p>
                 </div>
                 {loading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
             </div>
 
-            <div className="p-2 min-h-[300px]">
+            <div className="min-h-[300px] p-4">
                 {logs.length === 0 && !loading ? (
-                    <div className="p-12 text-center text-muted-foreground text-sm italic transition-colors">No signals detected yet</div>
+                    <div className="rounded-2xl border border-dashed border-border/70 p-12 text-center text-sm italic text-muted-foreground transition-colors">
+                        No signals detected yet
+                    </div>
                 ) : (
                     <Table>
                         <TableHeader>
@@ -120,8 +128,8 @@ export function RecentActivity() {
                                         </TableCell>
                                         <TableCell>
                                             <div className="flex items-center gap-1.5">
-                                                <div className="w-5 h-5 rounded-full bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">
-                                                    <span className="text-[10px] font-bold text-indigo-400">
+                                                <div className="flex h-6 w-6 items-center justify-center rounded-full border border-primary/20 bg-primary/10">
+                                                    <span className="text-[10px] font-bold text-primary">
                                                         {traderName.charAt(0).toUpperCase()}
                                                     </span>
                                                 </div>
@@ -135,7 +143,7 @@ export function RecentActivity() {
                                                         href={`https://dexscreener.com/solana/${tokenMint}`}
                                                         target="_blank"
                                                         title="View on DexScreener"
-                                                        className="text-sm font-bold text-foreground hover:text-indigo-400 transition-colors flex items-center gap-1 w-fit"
+                                                        className="flex w-fit items-center gap-1 text-sm font-bold text-foreground transition-colors hover:text-primary"
                                                     >
                                                         {symbol}
                                                         <ExternalLink className="w-2.5 h-2.5 opacity-50" />
@@ -172,7 +180,7 @@ export function RecentActivity() {
                                                     href={`https://solscan.io/tx/${log.signature}`}
                                                     target="_blank"
                                                     title="View TX on Solscan"
-                                                    className="text-[10px] text-muted-foreground/50 hover:text-indigo-500 dark:hover:text-indigo-400 font-mono mt-0.5 flex items-center transition-colors"
+                                                    className="mt-0.5 flex items-center font-mono text-[10px] text-muted-foreground/60 transition-colors hover:text-primary"
                                                 >
                                                     TX ↗
                                                 </a>
@@ -185,6 +193,6 @@ export function RecentActivity() {
                     </Table>
                 )}
             </div>
-        </div>
+        </section>
     );
 }

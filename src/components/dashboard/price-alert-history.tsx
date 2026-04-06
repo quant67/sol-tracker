@@ -93,24 +93,30 @@ export function PriceAlertHistory() {
     }, [fetchAlerts]);
 
     return (
-        <div className="bg-card border border-border rounded-2xl overflow-hidden transition-colors shadow-none">
-            <div className="px-6 py-4 border-b border-border bg-muted/30 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <Siren className="w-5 h-5 text-rose-400" />
-                    <h2 className="text-lg font-semibold text-foreground">Price Alert History</h2>
+        <section className="overflow-hidden rounded-[1.9rem] border border-border/70 bg-card/86 shadow-[inset_0_1px_0_color-mix(in_oklab,var(--color-foreground)_4%,transparent),0_24px_80px_-46px_rgba(0,0,0,0.95)] transition-colors">
+            <div className="flex items-start justify-between gap-4 border-b border-border/70 bg-[linear-gradient(145deg,color-mix(in_oklab,var(--color-card)_94%,transparent),color-mix(in_oklab,var(--color-primary)_7%,transparent))] px-6 py-5">
+                <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary/80">Alert Log</div>
+                    <div className="mt-2 flex items-center gap-3">
+                        <Siren className="h-5 w-5 text-primary" />
+                        <h2 className="text-2xl font-semibold tracking-[-0.03em] text-foreground">Price Alert History</h2>
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                        Review how strategies have fired over time and inspect the signal context without leaving the dashboard.
+                    </p>
                 </div>
                 {loading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
             </div>
 
             {errorMessage && (
-                <div className="mx-6 mt-4 rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+                <div className="mx-6 mt-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
                     {errorMessage}
                 </div>
             )}
 
-            <div className="p-2 min-h-[260px]">
+            <div className="min-h-[260px] p-4">
                 {alerts.length === 0 && !loading ? (
-                    <div className="p-12 text-center text-muted-foreground text-sm italic transition-colors">
+                    <div className="rounded-2xl border border-dashed border-border/70 p-12 text-center text-sm italic text-muted-foreground transition-colors">
                         No price alerts yet
                     </div>
                 ) : (
@@ -140,7 +146,7 @@ export function PriceAlertHistory() {
                                                     href={`https://dexscreener.com/solana/${row.mint}`}
                                                     target="_blank"
                                                     rel="noreferrer"
-                                                    className="text-sm font-semibold text-foreground hover:text-indigo-400 transition-colors w-fit flex items-center gap-1"
+                                                    className="flex w-fit items-center gap-1 text-sm font-semibold text-foreground transition-colors hover:text-primary"
                                                     title="View on DexScreener"
                                                 >
                                                     {symbol}
@@ -160,7 +166,7 @@ export function PriceAlertHistory() {
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            <Badge variant={isUp ? "secondary" : "outline"} className="font-mono">
+                                            <Badge variant={isUp ? "default" : "outline"} className="font-mono">
                                                 {summary}
                                             </Badge>
                                         </TableCell>
@@ -186,6 +192,6 @@ export function PriceAlertHistory() {
                     </Table>
                 )}
             </div>
-        </div>
+        </section>
     );
 }
