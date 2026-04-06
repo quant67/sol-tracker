@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Target, Loader2, Lock, ShieldCheck } from "lucide-react";
 
 export default function LoginPage() {
+    const passwordId = React.useId();
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
@@ -60,16 +61,18 @@ export default function LoginPage() {
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="space-y-2">
-                            <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                            <label htmlFor={passwordId} className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                                 Access key
                             </label>
                             <div className="relative">
                                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                                 <input
+                                    id={passwordId}
                                     type="password"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     placeholder="Enter your internal password"
+                                    autoComplete="current-password"
                                     autoFocus
                                     className="h-12 w-full rounded-2xl border border-input/90 bg-input/70 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground/85 outline-none transition-[border-color,box-shadow,background-color] focus:border-ring focus:bg-card focus:ring-4 focus:ring-ring/20"
                                 />

@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import { Target, Zap, RadioTower, TrendingUp } from "lucide-react";
+import { usePolling } from "@/hooks/use-polling";
 
 const POLL_INTERVAL = 5000; // 5 seconds
 
@@ -81,12 +82,7 @@ export function DashboardStats() {
         }
     }, []);
 
-    useEffect(() => {
-        fetchStats();
-
-        const interval = setInterval(fetchStats, POLL_INTERVAL);
-        return () => clearInterval(interval);
-    }, [fetchStats]);
+    usePolling(fetchStats, { intervalMs: POLL_INTERVAL });
 
     return (
         <section className="space-y-4">

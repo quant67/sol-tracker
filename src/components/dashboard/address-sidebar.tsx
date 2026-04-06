@@ -179,10 +179,11 @@ export function AddressSidebar() {
                 </span>
                 <Button
                     variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/10"
+                    size="icon-sm"
+                    className="text-muted-foreground hover:text-primary hover:bg-primary/10"
                     onClick={() => setShowAddPerson(!showAddPerson)}
                     title="Add person"
+                    aria-label={showAddPerson ? "Close add person form" : "Open add person form"}
                 >
                     {showAddPerson ? <X className="w-3.5 h-3.5" /> : <UserPlus className="w-3.5 h-3.5" />}
                 </Button>
@@ -223,39 +224,51 @@ export function AddressSidebar() {
                         return (
                             <div key={person.id} className="border-b border-border/40">
                                 {/* Person Row */}
-                                <div className="group flex cursor-pointer items-center gap-1 px-3 py-3 hover:bg-accent/35 transition-colors"
-                                    onClick={() => toggleExpand(person.id)}>
-                                    <span className="text-muted-foreground">
-                                        {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                                    </span>
-
+                                <div className="group flex items-center gap-2 px-3 py-2.5 transition-colors hover:bg-accent/35">
                                     {editingPersonId === person.id ? (
-                                        <div className="flex items-center gap-1 flex-1" onClick={e => e.stopPropagation()}>
+                                        <div className="flex min-w-0 flex-1 items-center gap-2">
+                                            <span className="text-muted-foreground shrink-0">
+                                                {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                                            </span>
                                             <Input
                                                 value={editPersonName}
                                                 onChange={e => setEditPersonName(e.target.value)}
-                                                className="h-6 text-xs bg-background border-border/50 shadow-none"
+                                                className="h-8 text-xs bg-background border-border/50 shadow-none"
                                                 autoFocus
                                                 onKeyDown={e => {
                                                     if (e.key === 'Enter') handleEditPersonSave(person.id);
                                                     if (e.key === 'Escape') setEditingPersonId(null);
                                                 }}
                                             />
-                                            <Button variant="ghost" size="icon" className="h-6 w-6 text-emerald-500"
+                                            <Button variant="ghost" size="icon-sm" className="text-emerald-500"
+                                                aria-label={`Save ${person.name}`}
                                                 onClick={() => handleEditPersonSave(person.id)}>
                                                 <Check className="w-3 h-3" />
                                             </Button>
                                         </div>
                                     ) : (
                                         <>
-                                            <span className="text-sm font-medium text-foreground truncate flex-1">{person.name}</span>
-                                            <span className="text-[10px] text-muted-foreground font-mono mr-1">{activeCount}/{person.addresses.length}</span>
-                                            <div className="flex items-center gap-0 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
-                                                <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                                            <button
+                                                type="button"
+                                                className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                                                onClick={() => toggleExpand(person.id)}
+                                                aria-expanded={isExpanded}
+                                                aria-controls={`person-addresses-${person.id}`}
+                                            >
+                                                <span className="text-muted-foreground shrink-0">
+                                                    {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                                                </span>
+                                                <span className="text-sm font-medium text-foreground truncate flex-1">{person.name}</span>
+                                                <span className="text-[10px] text-muted-foreground font-mono">{activeCount}/{person.addresses.length}</span>
+                                            </button>
+                                            <div className="flex items-center gap-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+                                                <Button variant="ghost" size="icon-sm" className="text-muted-foreground hover:text-foreground"
+                                                    aria-label={`Rename ${person.name}`}
                                                     onClick={() => { setEditingPersonId(person.id); setEditPersonName(person.name); }}>
                                                     <Pencil className="w-3 h-3" />
                                                 </Button>
-                                                <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-rose-400"
+                                                <Button variant="ghost" size="icon-sm" className="text-muted-foreground hover:text-rose-400"
+                                                    aria-label={`Delete ${person.name}`}
                                                     onClick={() => handleDeletePerson(person.id)}>
                                                     <Trash2 className="w-3 h-3" />
                                                 </Button>
@@ -266,7 +279,7 @@ export function AddressSidebar() {
 
                                 {/* Expanded: Addresses */}
                                 {isExpanded && (
-                                    <div className="bg-background/20">
+                                    <div id={`person-addresses-${person.id}`} className="bg-background/20">
                                         {person.addresses.map(addr => (
                                             <div key={addr.id} className={`group/addr flex items-center gap-2 pl-8 pr-3 py-2.5 hover:bg-accent/25 transition-colors ${!addr.is_active ? 'opacity-40' : ''}`}>
                                                 <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${addr.is_active ? 'bg-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.5)]' : 'bg-zinc-500'}`}></div>
@@ -274,9 +287,10 @@ export function AddressSidebar() {
                                                 {editingAddrId === addr.id ? (
                                                     <div className="flex items-center gap-1 flex-1 min-w-0">
                                                         <Input value={editAddrLabel} onChange={e => setEditAddrLabel(e.target.value)}
-                                                            className="h-5 text-[11px] bg-background border-border/50 shadow-none" autoFocus
+                                                            className="h-8 text-[11px] bg-background border-border/50 shadow-none" autoFocus
                                                             onKeyDown={e => { if (e.key === 'Enter') handleEditAddrSave(addr.id); if (e.key === 'Escape') setEditingAddrId(null); }} />
-                                                        <Button variant="ghost" size="icon" className="h-5 w-5 text-emerald-500"
+                                                        <Button variant="ghost" size="icon-sm" className="text-emerald-500"
+                                                            aria-label={`Save address label for ${addr.address}`}
                                                             onClick={() => handleEditAddrSave(addr.id)}><Check className="w-2.5 h-2.5" /></Button>
                                                     </div>
                                                 ) : (
@@ -285,16 +299,19 @@ export function AddressSidebar() {
                                                             {addr.label && <span className="text-[11px] text-foreground/70 block truncate">{addr.label}</span>}
                                                             <span className="text-[10px] font-mono text-muted-foreground">{addr.address.slice(0, 4)}...{addr.address.slice(-4)}</span>
                                                         </div>
-                                                        <div className="flex items-center gap-0 opacity-0 group-hover/addr:opacity-100 transition-opacity shrink-0">
-                                                            <Button variant="ghost" size="icon" className="h-5 w-5 text-muted-foreground hover:text-foreground"
+                                                        <div className="flex items-center gap-1 opacity-100 transition-opacity shrink-0 md:opacity-0 md:group-hover/addr:opacity-100">
+                                                            <Button variant="ghost" size="icon-sm" className="text-muted-foreground hover:text-foreground"
+                                                                aria-label={`Rename address ${addr.address}`}
                                                                 onClick={() => { setEditingAddrId(addr.id); setEditAddrLabel(addr.label || ""); }}>
                                                                 <Pencil className="w-2.5 h-2.5" />
                                                             </Button>
-                                                            <Button variant="ghost" size="icon" className="h-5 w-5 text-muted-foreground hover:text-amber-400"
+                                                            <Button variant="ghost" size="icon-sm" className="text-muted-foreground hover:text-amber-400"
+                                                                aria-label={addr.is_active ? `Pause address ${addr.address}` : `Resume address ${addr.address}`}
                                                                 onClick={() => handleToggleAddr(addr)} title={addr.is_active ? "Pause" : "Resume"}>
                                                                 {addr.is_active ? <Eye className="w-2.5 h-2.5" /> : <EyeOff className="w-2.5 h-2.5" />}
                                                             </Button>
-                                                            <Button variant="ghost" size="icon" className="h-5 w-5 text-muted-foreground hover:text-rose-400"
+                                                            <Button variant="ghost" size="icon-sm" className="text-muted-foreground hover:text-rose-400"
+                                                                aria-label={`Delete address ${addr.address}`}
                                                                 onClick={() => handleDeleteAddr(addr.id)}>
                                                                 <Trash2 className="w-2.5 h-2.5" />
                                                             </Button>

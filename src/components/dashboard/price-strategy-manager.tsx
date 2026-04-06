@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useId, useMemo, useState } from "react";
 import { Activity, Loader2, Pause, Play, Plus, Target, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { usePolling } from "@/hooks/use-polling";
 
 type StrategyType = "pct_change_up" | "pct_change_down" | "breakout_up" | "breakout_down" | "entry_long" | "entry_rebound" | "pullback_to_ma" | "failed_breakdown";
 
@@ -107,6 +108,7 @@ function SummaryCard({
 }
 
 export function PriceStrategyManager() {
+    const fieldId = useId();
     const [watchTokens, setWatchTokens] = useState<WatchToken[]>([]);
     const [strategies, setStrategies] = useState<Strategy[]>([]);
     const [loading, setLoading] = useState(true);
@@ -176,13 +178,7 @@ export function PriceStrategyManager() {
         }
     }, [selectedWatchTokenId]);
 
-    useEffect(() => {
-        void fetchAll();
-        const intervalId = window.setInterval(() => {
-            void fetchAll();
-        }, POLL_INTERVAL);
-        return () => window.clearInterval(intervalId);
-    }, [fetchAll]);
+    usePolling(fetchAll, { intervalMs: POLL_INTERVAL });
 
     const activeTokenCount = useMemo(
         () => watchTokens.filter((token) => token.is_active).length,
@@ -528,7 +524,7 @@ export function PriceStrategyManager() {
             )}
 
             <div className="space-y-6 p-6">
-                <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                     <SummaryCard label="Watch Tokens" value={watchTokens.length.toString()} detail={`${activeTokenCount} active`} />
                     <SummaryCard label="Strategies" value={strategies.length.toString()} detail={`${activeStrategyCount} running`} />
                     <SummaryCard
@@ -543,7 +539,7 @@ export function PriceStrategyManager() {
                     />
                 </div>
 
-                <div className="grid grid-cols-1 gap-6 xl:grid-cols-[290px_minmax(0,1fr)_360px]">
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)] 2xl:grid-cols-[290px_minmax(0,1fr)_360px]">
                     <section className="space-y-4 rounded-[1.5rem] border border-border/70 bg-background/16 p-5">
                         <div className="space-y-1">
                             <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary/80">Selection</div>
@@ -555,10 +551,12 @@ export function PriceStrategyManager() {
 
                         <form onSubmit={handleAddWatchToken} className="flex gap-2">
                             <Input
+                                id={`${fieldId}-mint-input`}
                                 placeholder="Token mint address..."
                                 value={mintInput}
                                 onChange={(event) => setMintInput(event.target.value)}
                                 className="font-mono text-xs"
+                                aria-label="Token mint address"
                             />
                             <Button type="submit" size="sm" disabled={busyAction === "add-token"}>
                                 {busyAction === "add-token" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
@@ -610,6 +608,7 @@ export function PriceStrategyManager() {
                                                     variant="ghost"
                                                     size="icon-xs"
                                                     title={token.is_active ? "Pause token" : "Activate token"}
+                                                    aria-label={token.is_active ? `Pause ${token.symbol || token.mint}` : `Activate ${token.symbol || token.mint}`}
                                                     onClick={() => toggleWatchToken(token)}
                                                     disabled={busyAction === `token-toggle-${token.id}`}
                                                 >
@@ -625,6 +624,7 @@ export function PriceStrategyManager() {
                                                     variant="ghost"
                                                     size="icon-xs"
                                                     title="Delete token"
+                                                    aria-label={`Delete ${token.symbol || token.mint}`}
                                                     onClick={() => deleteWatchToken(token)}
                                                     disabled={busyAction === `token-delete-${token.id}`}
                                                 >
@@ -673,11 +673,12 @@ export function PriceStrategyManager() {
                             )}
                         </div>
 
-                        <form onSubmit={handleAddStrategy} className="space-y-5 rounded-[1.5rem] border border-border/70 bg-background/28 p-5">
+                        <form onSubmit={handleAddStrategy} className="space-y-5 rounded-[1.25rem] border border-border/60 bg-background/18 p-5">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Watch Token</label>
+                                    <label htmlFor={`${fieldId}-watch-token`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Watch Token</label>
                                     <select
+                                        id={`${fieldId}-watch-token`}
                                         value={selectedWatchTokenId}
                                         onChange={(event) => setSelectedWatchTokenId(event.target.value)}
                                         className={selectClassName}
@@ -692,8 +693,9 @@ export function PriceStrategyManager() {
                                 </div>
 
                                 <div>
-                                    <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Strategy Type</label>
+                                    <label htmlFor={`${fieldId}-strategy-type`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Strategy Type</label>
                                     <select
+                                        id={`${fieldId}-strategy-type`}
                                         value={strategyType}
                                         onChange={(event) => setStrategyType(event.target.value as StrategyType)}
                                         className={selectClassName}
@@ -719,8 +721,9 @@ export function PriceStrategyManager() {
                             </div>
 
                             <div>
-                                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Strategy Name (optional)</label>
+                                <label htmlFor={`${fieldId}-strategy-name`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Strategy Name (optional)</label>
                                 <Input
+                                    id={`${fieldId}-strategy-name`}
                                     value={strategyName}
                                     onChange={(event) => setStrategyName(event.target.value)}
                                     placeholder="e.g. 5m Pump Alert"
@@ -730,41 +733,41 @@ export function PriceStrategyManager() {
                             {(strategyType === "pct_change_up" || strategyType === "pct_change_down") ? (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
-                                        <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Window (min)</label>
-                                        <Input value={windowMin} onChange={(event) => setWindowMin(event.target.value)} />
+                                        <label htmlFor={`${fieldId}-window-min`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Window (min)</label>
+                                        <Input id={`${fieldId}-window-min`} value={windowMin} onChange={(event) => setWindowMin(event.target.value)} />
                                     </div>
                                     <div>
-                                        <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Threshold (%)</label>
-                                        <Input value={thresholdPct} onChange={(event) => setThresholdPct(event.target.value)} />
+                                        <label htmlFor={`${fieldId}-threshold-pct`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Threshold (%)</label>
+                                        <Input id={`${fieldId}-threshold-pct`} value={thresholdPct} onChange={(event) => setThresholdPct(event.target.value)} />
                                     </div>
                                 </div>
                             ) : (strategyType === "entry_long" || strategyType === "entry_rebound" || strategyType === "pullback_to_ma" || strategyType === "failed_breakdown") ? (
                                 <div className="space-y-4">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
-                                            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Lookback (min)</label>
-                                            <Input value={lookbackMin} onChange={(event) => setLookbackMin(event.target.value)} />
+                                            <label htmlFor={`${fieldId}-lookback-min`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Lookback (min)</label>
+                                            <Input id={`${fieldId}-lookback-min`} value={lookbackMin} onChange={(event) => setLookbackMin(event.target.value)} />
                                         </div>
                                         <div>
-                                            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Target (%)</label>
-                                            <Input value={entryTargetPct} onChange={(event) => setEntryTargetPct(event.target.value)} />
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Fast MA (min)</label>
-                                            <Input value={fastWindowMin} onChange={(event) => setFastWindowMin(event.target.value)} />
-                                        </div>
-                                        <div>
-                                            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Slow MA (min)</label>
-                                            <Input value={slowWindowMin} onChange={(event) => setSlowWindowMin(event.target.value)} />
+                                            <label htmlFor={`${fieldId}-entry-target-pct`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Target (%)</label>
+                                            <Input id={`${fieldId}-entry-target-pct`} value={entryTargetPct} onChange={(event) => setEntryTargetPct(event.target.value)} />
                                         </div>
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
-                                            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                                            <label htmlFor={`${fieldId}-fast-window-min`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Fast MA (min)</label>
+                                            <Input id={`${fieldId}-fast-window-min`} value={fastWindowMin} onChange={(event) => setFastWindowMin(event.target.value)} />
+                                        </div>
+                                        <div>
+                                            <label htmlFor={`${fieldId}-slow-window-min`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Slow MA (min)</label>
+                                            <Input id={`${fieldId}-slow-window-min`} value={slowWindowMin} onChange={(event) => setSlowWindowMin(event.target.value)} />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label htmlFor={`${fieldId}-dynamic-primary`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                                                 {strategyType === "entry_long"
                                                     ? "Breakout Tolerance (%)"
                                                     : strategyType === "entry_rebound"
@@ -774,6 +777,7 @@ export function PriceStrategyManager() {
                                                         : "Pullback Tolerance (%)"}
                                             </label>
                                             <Input
+                                                id={`${fieldId}-dynamic-primary`}
                                                 value={strategyType === "entry_long"
                                                     ? breakoutTolerancePct
                                                     : strategyType === "entry_rebound"
@@ -791,7 +795,7 @@ export function PriceStrategyManager() {
                                             />
                                         </div>
                                         <div>
-                                            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                                            <label htmlFor={`${fieldId}-dynamic-secondary`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                                                 {strategyType === "entry_long"
                                                     ? "Min Trend (%)"
                                                     : strategyType === "entry_rebound"
@@ -801,6 +805,7 @@ export function PriceStrategyManager() {
                                                         : "Min Trend (%)"}
                                             </label>
                                             <Input
+                                                id={`${fieldId}-dynamic-secondary`}
                                                 value={strategyType === "entry_long"
                                                     ? minTrendPct
                                                     : strategyType === "entry_rebound"
@@ -822,8 +827,8 @@ export function PriceStrategyManager() {
                                     {strategyType === "failed_breakdown" && (
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <div>
-                                                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Min Drawdown (%)</label>
-                                                <Input value={minDrawdownPct} onChange={(event) => setMinDrawdownPct(event.target.value)} />
+                                                <label htmlFor={`${fieldId}-min-drawdown-pct`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Min Drawdown (%)</label>
+                                                <Input id={`${fieldId}-min-drawdown-pct`} value={minDrawdownPct} onChange={(event) => setMinDrawdownPct(event.target.value)} />
                                             </div>
                                             <div className="rounded-[1.1rem] border border-dashed border-border/70 bg-background/24 px-3 py-2 text-[11px] text-muted-foreground">
                                                 Experimental bottom model: previous sample must sit near the local low, then current price reclaims above fast MA.
@@ -833,19 +838,20 @@ export function PriceStrategyManager() {
                                 </div>
                             ) : (
                                 <div>
-                                    <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Target Price ($)</label>
-                                    <Input value={targetPrice} onChange={(event) => setTargetPrice(event.target.value)} />
+                                    <label htmlFor={`${fieldId}-target-price`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Target Price ($)</label>
+                                    <Input id={`${fieldId}-target-price`} value={targetPrice} onChange={(event) => setTargetPrice(event.target.value)} />
                                 </div>
                             )}
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Cooldown (sec)</label>
-                                    <Input value={cooldownSec} onChange={(event) => setCooldownSec(event.target.value)} />
+                                    <label htmlFor={`${fieldId}-cooldown-sec`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Cooldown (sec)</label>
+                                    <Input id={`${fieldId}-cooldown-sec`} value={cooldownSec} onChange={(event) => setCooldownSec(event.target.value)} />
                                 </div>
                                 <div>
-                                    <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Chat ID (optional)</label>
+                                    <label htmlFor={`${fieldId}-chat-id`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Chat ID (optional)</label>
                                     <Input
+                                        id={`${fieldId}-chat-id`}
                                         value={chatId}
                                         onChange={(event) => setChatId(event.target.value)}
                                         placeholder="default from env if empty"
@@ -871,10 +877,11 @@ export function PriceStrategyManager() {
                             </p>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <div>
-                                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Scope</label>
+                                <label htmlFor={`${fieldId}-strategy-scope`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Scope</label>
                                 <select
+                                    id={`${fieldId}-strategy-scope`}
                                     value={strategyListScope}
                                     onChange={(event) => setStrategyListScope(event.target.value as "selected" | "all")}
                                     className={selectClassName}
@@ -884,8 +891,9 @@ export function PriceStrategyManager() {
                                 </select>
                             </div>
                             <div>
-                                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Status</label>
+                                <label htmlFor={`${fieldId}-strategy-status`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Status</label>
                                 <select
+                                    id={`${fieldId}-strategy-status`}
                                     value={strategyStatusFilter}
                                     onChange={(event) => setStrategyStatusFilter(event.target.value as "active" | "all")}
                                     className={selectClassName}
@@ -942,6 +950,7 @@ export function PriceStrategyManager() {
                                                     variant="ghost"
                                                     size="icon-xs"
                                                     title={strategy.is_active ? "Pause strategy" : "Enable strategy"}
+                                                    aria-label={strategy.is_active ? `Pause strategy ${strategy.name}` : `Enable strategy ${strategy.name}`}
                                                     onClick={() => toggleStrategy(strategy)}
                                                     disabled={busyAction === `strategy-toggle-${strategy.id}`}
                                                 >
@@ -957,6 +966,7 @@ export function PriceStrategyManager() {
                                                     variant="ghost"
                                                     size="icon-xs"
                                                     title="Delete strategy"
+                                                    aria-label={`Delete strategy ${strategy.name}`}
                                                     onClick={() => deleteStrategy(strategy)}
                                                     disabled={busyAction === `strategy-delete-${strategy.id}`}
                                                 >

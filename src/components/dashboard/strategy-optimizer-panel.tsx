@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useId, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2, WandSparkles } from "lucide-react";
+import { usePolling } from "@/hooks/use-polling";
 
 interface WatchTokenOption {
     id: string;
@@ -181,6 +182,7 @@ function MetricCard({
 }
 
 export function StrategyOptimizerPanel() {
+    const fieldId = useId();
     const [watchTokens, setWatchTokens] = useState<WatchTokenOption[]>([]);
     const [selectedWatchTokenId, setSelectedWatchTokenId] = useState("");
     const [historyDays, setHistoryDays] = useState("30");
@@ -217,13 +219,7 @@ export function StrategyOptimizerPanel() {
         }
     }, [selectedWatchTokenId]);
 
-    useEffect(() => {
-        fetchWatchTokens();
-        const timer = window.setInterval(() => {
-            void fetchWatchTokens();
-        }, POLL_INTERVAL);
-        return () => window.clearInterval(timer);
-    }, [fetchWatchTokens]);
+    usePolling(fetchWatchTokens, { intervalMs: POLL_INTERVAL });
 
     const selectedToken = useMemo(
         () => watchTokens.find((token) => token.id === selectedWatchTokenId) || null,
@@ -261,43 +257,43 @@ export function StrategyOptimizerPanel() {
         }
     }, [result]);
 
-    useEffect(() => {
+    usePolling(async () => {
         if (!activeJob?.id) return;
         if (activeJob.status === "completed" || activeJob.status === "failed") return;
 
-        const timer = window.setInterval(async () => {
-            try {
-                const response = await fetch(`/api/strategy-optimize/jobs/${activeJob.id}`);
-                if (!response.ok) {
-                    const data = await response.json().catch(() => ({}));
-                    throw new Error(data?.error || "Failed to refresh optimization job");
-                }
-
-                const job = await response.json() as OptimizationJob;
-                setActiveJob(job);
-
-                if (job.status === "completed" && job.result_json) {
-                    setResult(job.result_json);
-                    setStatusMessage(
-                        job.result_json.optimization.topRecommendations.length > 0
-                            ? "Optimization finished. Review the recommendations below."
-                            : "Optimization finished, but no viable strategy was found. Try longer history or a smaller interval."
-                    );
-                    setRunning(false);
-                } else if (job.status === "failed") {
-                    setErrorMessage(job.error_message || "Optimization failed");
-                    setRunning(false);
-                } else {
-                    setStatusMessage(job.progress_message || `Optimization ${job.status}...`);
-                }
-            } catch (error: unknown) {
-                setErrorMessage(error instanceof Error ? error.message : "Unknown error");
-                setRunning(false);
+        try {
+            const response = await fetch(`/api/strategy-optimize/jobs/${activeJob.id}`);
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data?.error || "Failed to refresh optimization job");
             }
-        }, JOB_POLL_INTERVAL);
 
-        return () => window.clearInterval(timer);
-    }, [activeJob]);
+            const job = await response.json() as OptimizationJob;
+            setActiveJob(job);
+
+            if (job.status === "completed" && job.result_json) {
+                setResult(job.result_json);
+                setStatusMessage(
+                    job.result_json.optimization.topRecommendations.length > 0
+                        ? "Optimization finished. Review the recommendations below."
+                        : "Optimization finished, but no viable strategy was found. Try longer history or a smaller interval."
+                );
+                setRunning(false);
+            } else if (job.status === "failed") {
+                setErrorMessage(job.error_message || "Optimization failed");
+                setRunning(false);
+            } else {
+                setStatusMessage(job.progress_message || `Optimization ${job.status}...`);
+            }
+        } catch (error: unknown) {
+            setErrorMessage(error instanceof Error ? error.message : "Unknown error");
+            setRunning(false);
+        }
+    }, {
+        enabled: Boolean(activeJob?.id) && activeJob?.status !== "completed" && activeJob?.status !== "failed",
+        intervalMs: JOB_POLL_INTERVAL,
+        runImmediately: false,
+    });
 
     const runOptimization = async () => {
         if (!selectedWatchTokenId) {
@@ -462,8 +458,9 @@ export function StrategyOptimizerPanel() {
 
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
                             <div className="md:col-span-2">
-                                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Watch Token</label>
+                                <label htmlFor={`${fieldId}-watch-token`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Watch Token</label>
                                 <select
+                                    id={`${fieldId}-watch-token`}
                                     value={selectedWatchTokenId}
                                     onChange={(event) => setSelectedWatchTokenId(event.target.value)}
                                     className={selectClassName}
@@ -477,12 +474,13 @@ export function StrategyOptimizerPanel() {
                                 </select>
                             </div>
                             <div>
-                                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">History (days)</label>
-                                <Input value={historyDays} onChange={(event) => setHistoryDays(event.target.value)} />
+                                <label htmlFor={`${fieldId}-history-days`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">History (days)</label>
+                                <Input id={`${fieldId}-history-days`} value={historyDays} onChange={(event) => setHistoryDays(event.target.value)} />
                             </div>
                             <div>
-                                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Interval</label>
+                                <label htmlFor={`${fieldId}-interval`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Interval</label>
                                 <select
+                                    id={`${fieldId}-interval`}
                                     value={interval}
                                     onChange={(event) => setInterval(event.target.value as "5m" | "15m" | "1h")}
                                     className={selectClassName}
@@ -496,8 +494,9 @@ export function StrategyOptimizerPanel() {
 
                         <div className="grid grid-cols-1 items-end gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
                             <div>
-                                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Trading Style</label>
+                                <label htmlFor={`${fieldId}-trading-style`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Trading Style</label>
                                 <select
+                                    id={`${fieldId}-trading-style`}
                                     value={style}
                                     onChange={(event) => setStyle(event.target.value as "conservative" | "balanced" | "aggressive")}
                                     className={selectClassName}

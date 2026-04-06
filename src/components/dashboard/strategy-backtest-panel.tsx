@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useId, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2, FlaskConical } from "lucide-react";
+import { usePolling } from "@/hooks/use-polling";
 
 interface StrategyOption {
     id: string;
@@ -117,6 +118,7 @@ function MetricCard({
 }
 
 export function StrategyBacktestPanel() {
+    const fieldId = useId();
     const [strategies, setStrategies] = useState<StrategyOption[]>([]);
     const [selectedStrategyId, setSelectedStrategyId] = useState("");
     const [lookaheadMin, setLookaheadMin] = useState("120");
@@ -149,11 +151,7 @@ export function StrategyBacktestPanel() {
         }
     }, [selectedStrategyId]);
 
-    useEffect(() => {
-        fetchStrategies();
-        const interval = setInterval(fetchStrategies, POLL_INTERVAL);
-        return () => clearInterval(interval);
-    }, [fetchStrategies]);
+    usePolling(fetchStrategies, { intervalMs: POLL_INTERVAL });
 
     const selectedStrategy = useMemo(
         () => strategies.find((strategy) => strategy.id === selectedStrategyId) || null,
@@ -231,8 +229,9 @@ export function StrategyBacktestPanel() {
                 <div className="rounded-[1.5rem] border border-border/70 bg-background/16 p-5">
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
                         <div className="md:col-span-2">
-                            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Entry Strategy</label>
+                            <label htmlFor={`${fieldId}-entry-strategy`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Entry Strategy</label>
                             <select
+                                id={`${fieldId}-entry-strategy`}
                                 value={selectedStrategyId}
                                 onChange={(e) => setSelectedStrategyId(e.target.value)}
                                 className={selectClassName}
@@ -249,12 +248,12 @@ export function StrategyBacktestPanel() {
                             </select>
                         </div>
                         <div>
-                            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Lookahead (min)</label>
-                            <Input value={lookaheadMin} onChange={(e) => setLookaheadMin(e.target.value)} />
+                            <label htmlFor={`${fieldId}-lookahead-min`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Lookahead (min)</label>
+                            <Input id={`${fieldId}-lookahead-min`} value={lookaheadMin} onChange={(e) => setLookaheadMin(e.target.value)} />
                         </div>
                         <div>
-                            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">History (days)</label>
-                            <Input value={historyDays} onChange={(e) => setHistoryDays(e.target.value)} />
+                            <label htmlFor={`${fieldId}-history-days`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">History (days)</label>
+                            <Input id={`${fieldId}-history-days`} value={historyDays} onChange={(e) => setHistoryDays(e.target.value)} />
                         </div>
                     </div>
 

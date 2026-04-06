@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
+import { usePolling } from "@/hooks/use-polling";
 import { Loader2, Siren, ExternalLink } from "lucide-react";
 import {
     Table,
@@ -86,11 +87,7 @@ export function PriceAlertHistory() {
         }
     }, []);
 
-    useEffect(() => {
-        fetchAlerts();
-        const interval = setInterval(fetchAlerts, POLL_INTERVAL);
-        return () => clearInterval(interval);
-    }, [fetchAlerts]);
+    usePolling(fetchAlerts, { intervalMs: POLL_INTERVAL });
 
     return (
         <section className="overflow-hidden rounded-[1.9rem] border border-border/70 bg-card/86 shadow-[inset_0_1px_0_color-mix(in_oklab,var(--color-foreground)_4%,transparent),0_24px_80px_-46px_rgba(0,0,0,0.95)] transition-colors">
@@ -120,6 +117,61 @@ export function PriceAlertHistory() {
                         No price alerts yet
                     </div>
                 ) : (
+                    <>
+                    <div className="space-y-3 md:hidden">
+                        {alerts.map((row) => {
+                            const symbol = row.token_symbol || `${row.mint.slice(0, 4)}...`;
+                            const summary = summarizeSnapshot(row.snapshot || {});
+                            const currentPrice = formatPrice(row.snapshot?.currentPrice);
+                            const strategyType = row.strategy_type || "unknown";
+                            const isUp = strategyType.includes("up") || strategyType === "entry_long" || strategyType === "entry_rebound" || strategyType === "pullback_to_ma" || strategyType === "failed_breakdown";
+
+                            return (
+                                <article key={row.id} className="rounded-[1.35rem] border border-border/70 bg-background/25 p-4">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <a
+                                                href={`https://dexscreener.com/solana/${row.mint}`}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="flex w-fit items-center gap-1 text-sm font-semibold text-foreground hover:text-primary"
+                                                title="View on DexScreener"
+                                            >
+                                                {symbol}
+                                                <ExternalLink className="w-3 h-3 opacity-60" />
+                                            </a>
+                                            <div className="mt-1 text-[10px] font-mono text-muted-foreground">{row.mint.slice(0, 6)}...{row.mint.slice(-6)}</div>
+                                        </div>
+                                        <Badge variant={isUp ? "default" : "outline"} className="max-w-[12rem] whitespace-normal break-words font-mono">
+                                            {summary}
+                                        </Badge>
+                                    </div>
+                                    <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
+                                        <div>
+                                            <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Strategy</div>
+                                            <div className="mt-1 text-foreground">{row.strategy_name || "Unnamed"}</div>
+                                            <div className="text-[10px] text-muted-foreground">{strategyType}</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Price</div>
+                                            <div className="mt-1 font-mono text-foreground/90">{currentPrice}</div>
+                                        </div>
+                                    </div>
+                                    <div className="mt-4 text-[11px] text-muted-foreground">
+                                        {new Date(row.triggered_at).toLocaleString([], {
+                                            hour12: false,
+                                            month: "2-digit",
+                                            day: "2-digit",
+                                            hour: "2-digit",
+                                            minute: "2-digit",
+                                            second: "2-digit",
+                                        })}
+                                    </div>
+                                </article>
+                            );
+                        })}
+                    </div>
+                    <div className="hidden md:block">
                     <Table>
                         <TableHeader>
                             <TableRow className="border-border hover:bg-transparent">
@@ -190,6 +242,8 @@ export function PriceAlertHistory() {
                             })}
                         </TableBody>
                     </Table>
+                    </div>
+                    </>
                 )}
             </div>
         </section>

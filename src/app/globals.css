@@ -120,9 +120,6 @@
   * {
     @apply border-border outline-ring/50;
   }
-  html {
-    color-scheme: dark;
-  }
   body {
     @apply bg-background text-foreground;
     background-image:
