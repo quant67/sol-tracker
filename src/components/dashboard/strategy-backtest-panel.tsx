@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useId, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2, FlaskConical } from "lucide-react";
+import { usePolling } from "@/hooks/use-polling";
 
 interface StrategyOption {
     id: string;
@@ -65,6 +66,7 @@ interface BacktestSummary {
 }
 
 const POLL_INTERVAL = 10000;
+const selectClassName = "h-10 w-full rounded-xl border border-input/90 bg-input/70 px-3.5 text-sm text-foreground outline-none transition-[border-color,box-shadow,background-color] focus:border-ring focus:bg-card focus:ring-4 focus:ring-ring/20";
 
 function formatPercent(value: number | null | undefined): string {
     if (value === null || value === undefined || !Number.isFinite(value)) return "-";
@@ -89,7 +91,34 @@ function getTokenMeta(strategy: StrategyOption): { mint: string; symbol: string 
     };
 }
 
+function MetricCard({
+    label,
+    value,
+    detail,
+    tone = "default",
+}: {
+    label: string;
+    value: string;
+    detail: string;
+    tone?: "default" | "positive" | "warning";
+}) {
+    const toneClass = tone === "positive"
+        ? "text-emerald-300"
+        : tone === "warning"
+            ? "text-rose-300"
+            : "text-foreground";
+
+    return (
+        <div className="rounded-[1.25rem] border border-border/70 bg-background/30 p-4 shadow-[inset_0_1px_0_color-mix(in_oklab,var(--color-foreground)_4%,transparent)]">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{label}</div>
+            <div className={`mt-2 text-lg font-semibold tracking-[-0.03em] ${toneClass}`}>{value}</div>
+            <div className="mt-1 text-xs text-muted-foreground">{detail}</div>
+        </div>
+    );
+}
+
 export function StrategyBacktestPanel() {
+    const fieldId = useId();
     const [strategies, setStrategies] = useState<StrategyOption[]>([]);
     const [selectedStrategyId, setSelectedStrategyId] = useState("");
     const [lookaheadMin, setLookaheadMin] = useState("120");
@@ -122,11 +151,7 @@ export function StrategyBacktestPanel() {
         }
     }, [selectedStrategyId]);
 
-    useEffect(() => {
-        fetchStrategies();
-        const interval = setInterval(fetchStrategies, POLL_INTERVAL);
-        return () => clearInterval(interval);
-    }, [fetchStrategies]);
+    usePolling(fetchStrategies, { intervalMs: POLL_INTERVAL });
 
     const selectedStrategy = useMemo(
         () => strategies.find((strategy) => strategy.id === selectedStrategyId) || null,
@@ -174,149 +199,133 @@ export function StrategyBacktestPanel() {
     };
 
     return (
-        <div className="bg-card border border-border rounded-2xl overflow-hidden transition-colors shadow-none">
-            <div className="px-6 py-4 border-b border-border bg-muted/30 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <FlaskConical className="w-5 h-5 text-cyan-400" />
-                    <div>
-                        <h2 className="text-lg font-semibold text-foreground">Signal Backtest</h2>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            Validate how fast a signal works, how deep it pulls back, and how results change across multiple windows.
-                        </p>
+        <section className="overflow-hidden rounded-[1.9rem] border border-border/70 bg-card/86 shadow-[inset_0_1px_0_color-mix(in_oklab,var(--color-foreground)_4%,transparent),0_24px_80px_-46px_rgba(0,0,0,0.95)] transition-colors">
+            <div className="flex items-start justify-between gap-4 border-b border-border/70 bg-[linear-gradient(145deg,color-mix(in_oklab,var(--color-card)_94%,transparent),color-mix(in_oklab,var(--color-primary)_7%,transparent))] px-6 py-5">
+                <div className="min-w-0">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary/80">
+                        Validation Layer
                     </div>
+                    <div className="mt-2 flex items-center gap-3">
+                        <FlaskConical className="h-5 w-5 text-primary" />
+                        <h2 className="text-2xl font-semibold tracking-[-0.03em] text-foreground">Signal Backtest</h2>
+                    </div>
+                    <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+                        Validate how fast a signal works, how deep it pulls back, and how results change across multiple windows before promoting it to live monitoring.
+                    </p>
                 </div>
-                {loading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
+                <div className="flex items-center gap-2 rounded-full border border-border/70 bg-background/35 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" /> : <FlaskConical className="w-3.5 h-3.5 text-primary" />}
+                    {loading ? "Loading" : "Backtest ready"}
+                </div>
             </div>
 
             {errorMessage && (
-                <div className="mx-6 mt-4 rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+                <div className="mx-6 mt-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
                     {errorMessage}
                 </div>
             )}
 
-            <div className="p-6 space-y-5">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                    <div className="md:col-span-2">
-                        <label className="text-[11px] text-muted-foreground block mb-1">Entry Strategy</label>
-                        <select
-                            value={selectedStrategyId}
-                            onChange={(e) => setSelectedStrategyId(e.target.value)}
-                            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        >
-                            <option value="">Select entry signal</option>
-                            {strategies.map((strategy) => {
-                                const token = getTokenMeta(strategy);
-                                return (
-                                    <option key={strategy.id} value={strategy.id}>
-                                        {strategy.name} · {token.symbol}
-                                    </option>
-                                );
-                            })}
-                        </select>
+            <div className="space-y-5 p-6">
+                <div className="rounded-[1.5rem] border border-border/70 bg-background/16 p-5">
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+                        <div className="md:col-span-2">
+                            <label htmlFor={`${fieldId}-entry-strategy`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Entry Strategy</label>
+                            <select
+                                id={`${fieldId}-entry-strategy`}
+                                value={selectedStrategyId}
+                                onChange={(e) => setSelectedStrategyId(e.target.value)}
+                                className={selectClassName}
+                            >
+                                <option value="">Select entry signal</option>
+                                {strategies.map((strategy) => {
+                                    const token = getTokenMeta(strategy);
+                                    return (
+                                        <option key={strategy.id} value={strategy.id}>
+                                            {strategy.name} · {token.symbol}
+                                        </option>
+                                    );
+                                })}
+                            </select>
+                        </div>
+                        <div>
+                            <label htmlFor={`${fieldId}-lookahead-min`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Lookahead (min)</label>
+                            <Input id={`${fieldId}-lookahead-min`} value={lookaheadMin} onChange={(e) => setLookaheadMin(e.target.value)} />
+                        </div>
+                        <div>
+                            <label htmlFor={`${fieldId}-history-days`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">History (days)</label>
+                            <Input id={`${fieldId}-history-days`} value={historyDays} onChange={(e) => setHistoryDays(e.target.value)} />
+                        </div>
                     </div>
-                    <div>
-                        <label className="text-[11px] text-muted-foreground block mb-1">Lookahead (min)</label>
-                        <Input value={lookaheadMin} onChange={(e) => setLookaheadMin(e.target.value)} />
-                    </div>
-                    <div>
-                        <label className="text-[11px] text-muted-foreground block mb-1">History (days)</label>
-                        <Input value={historyDays} onChange={(e) => setHistoryDays(e.target.value)} />
-                    </div>
-                </div>
 
-                <div className="flex items-center gap-3">
-                    <Button onClick={handleRunBacktest} disabled={running || !selectedStrategyId}>
-                        {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <FlaskConical className="w-4 h-4" />}
-                        Run Backtest
-                    </Button>
-                    {selectedStrategy && (
-                        <Badge variant="outline" className="font-mono">
-                            {selectedStrategy.type}
-                        </Badge>
-                    )}
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                        <Button onClick={handleRunBacktest} disabled={running || !selectedStrategyId}>
+                            {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <FlaskConical className="w-4 h-4" />}
+                            Run Backtest
+                        </Button>
+                        {selectedStrategy && (
+                            <Badge variant="outline" className="font-mono">
+                                {selectedStrategy.type}
+                            </Badge>
+                        )}
+                    </div>
                 </div>
 
                 {result && (
                     <div className="space-y-4">
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            <div className="rounded-lg border border-border bg-muted/20 p-3">
-                                <div className="text-[11px] text-muted-foreground">Actionable Signals</div>
-                                <div className="text-xl font-semibold text-foreground">{result.signalsTriggered}</div>
-                            </div>
-                            <div className="rounded-lg border border-border bg-muted/20 p-3">
-                                <div className="text-[11px] text-muted-foreground">Resolved / Hits</div>
-                                <div className="text-xl font-semibold text-emerald-400">{result.hits}</div>
-                                <div className="text-[11px] text-muted-foreground mt-1">
-                                    {result.resolvedSignals} resolved · {result.skippedSignals} skipped
-                                </div>
-                            </div>
-                            <div className="rounded-lg border border-border bg-muted/20 p-3">
-                                <div className="text-[11px] text-muted-foreground">Hit Rate</div>
-                                <div className="text-xl font-semibold text-cyan-300">{formatPercent(result.hitRate)}</div>
-                            </div>
-                            <div className="rounded-lg border border-border bg-muted/20 p-3">
-                                <div className="text-[11px] text-muted-foreground">Avg MFE</div>
-                                <div className="text-xl font-semibold text-foreground">{formatPercent(result.avgMfePct)}</div>
-                            </div>
+                        <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
+                            <MetricCard label="Actionable Signals" value={result.signalsTriggered.toString()} detail="Signals worth evaluating" />
+                            <MetricCard label="Resolved / Hits" value={result.hits.toString()} detail={`${result.resolvedSignals} resolved · ${result.skippedSignals} skipped`} tone="positive" />
+                            <MetricCard label="Hit Rate" value={formatPercent(result.hitRate)} detail={`${result.lookaheadMin} minute lookahead`} tone="positive" />
+                            <MetricCard label="Avg MFE" value={formatPercent(result.avgMfePct)} detail="Best excursion after entry" />
+                            <MetricCard label="Avg MAE" value={formatPercent(result.avgMaePct)} detail="Worst excursion after entry" tone="warning" />
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                            <div className="rounded-lg border border-border bg-muted/20 p-3">
-                                <div className="text-[11px] text-muted-foreground">Avg Minutes to Target</div>
-                                <div className="text-base font-semibold text-foreground">
-                                    {result.avgMinutesToHit === null ? "-" : `${result.avgMinutesToHit.toFixed(2)} min`}
-                                </div>
-                            </div>
-                            <div className="rounded-lg border border-border bg-muted/20 p-3">
-                                <div className="text-[11px] text-muted-foreground">Lookahead</div>
-                                <div className="text-base font-semibold text-foreground">{result.lookaheadMin} min</div>
-                            </div>
-                            <div className="rounded-lg border border-border bg-muted/20 p-3">
-                                <div className="text-[11px] text-muted-foreground">Avg MAE</div>
-                                <div className="text-base font-semibold text-rose-300">{formatPercent(result.avgMaePct)}</div>
-                            </div>
-                            <div className="rounded-lg border border-border bg-muted/20 p-3">
-                                <div className="text-[11px] text-muted-foreground">Avg End Return</div>
-                                <div className="text-base font-semibold text-foreground">{formatPercent(result.avgEndReturnPct)}</div>
-                            </div>
-                            <div className="rounded-lg border border-border bg-muted/20 p-3 md:col-span-1">
-                                <div className="text-[11px] text-muted-foreground">Snapshots Used</div>
-                                <div className="text-base font-semibold text-foreground">{result.snapshotsUsed}</div>
-                            </div>
+                        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+                            <MetricCard
+                                label="Avg Minutes to Target"
+                                value={result.avgMinutesToHit === null ? "-" : `${result.avgMinutesToHit.toFixed(2)}m`}
+                                detail="Average time to resolution"
+                            />
+                            <MetricCard label="Avg End Return" value={formatPercent(result.avgEndReturnPct)} detail="Final lookahead return" />
+                            <MetricCard label="Snapshots Used" value={result.snapshotsUsed.toString()} detail="Historical samples processed" />
+                            <MetricCard label="Token" value={selectedStrategy ? getTokenMeta(selectedStrategy).symbol : "TOKEN"} detail={result.tokenMint} />
                         </div>
 
-                        <div>
-                            <div className="flex items-center justify-between gap-2 mb-2">
-                                <div className="text-sm font-semibold text-foreground">Window Profile</div>
+                        <div className="space-y-3 rounded-[1.5rem] border border-border/70 bg-background/16 p-5">
+                            <div className="flex items-center justify-between gap-2">
+                                <div>
+                                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary/80">Window Profile</div>
+                                    <div className="mt-2 text-base font-semibold text-foreground">Lookahead Comparison</div>
+                                </div>
                                 <div className="text-[11px] text-muted-foreground">
                                     Compare hit rate and excursion metrics across multiple lookahead windows.
                                 </div>
                             </div>
-                            <div className="overflow-x-auto rounded-lg border border-border bg-muted/20">
+                            <div className="overflow-x-auto rounded-2xl border border-border/70 bg-background/20">
                                 <table className="w-full min-w-[720px] text-xs">
                                     <thead className="bg-background/60 text-muted-foreground">
                                         <tr>
-                                            <th className="px-3 py-2 text-left font-medium">Window</th>
-                                            <th className="px-3 py-2 text-left font-medium">Resolved</th>
-                                            <th className="px-3 py-2 text-left font-medium">Hits</th>
-                                            <th className="px-3 py-2 text-left font-medium">Hit Rate</th>
-                                            <th className="px-3 py-2 text-left font-medium">Avg MFE</th>
-                                            <th className="px-3 py-2 text-left font-medium">Avg MAE</th>
-                                            <th className="px-3 py-2 text-left font-medium">Avg End</th>
-                                            <th className="px-3 py-2 text-left font-medium">Avg Minutes</th>
+                                            <th className="px-3 py-3 text-left font-semibold uppercase tracking-[0.14em]">Window</th>
+                                            <th className="px-3 py-3 text-left font-semibold uppercase tracking-[0.14em]">Resolved</th>
+                                            <th className="px-3 py-3 text-left font-semibold uppercase tracking-[0.14em]">Hits</th>
+                                            <th className="px-3 py-3 text-left font-semibold uppercase tracking-[0.14em]">Hit Rate</th>
+                                            <th className="px-3 py-3 text-left font-semibold uppercase tracking-[0.14em]">Avg MFE</th>
+                                            <th className="px-3 py-3 text-left font-semibold uppercase tracking-[0.14em]">Avg MAE</th>
+                                            <th className="px-3 py-3 text-left font-semibold uppercase tracking-[0.14em]">Avg End</th>
+                                            <th className="px-3 py-3 text-left font-semibold uppercase tracking-[0.14em]">Avg Minutes</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {result.windowMetrics.map((metric) => (
                                             <tr key={metric.lookaheadMin} className="border-t border-border/70">
-                                                <td className="px-3 py-2 font-semibold text-foreground">{metric.lookaheadMin}m</td>
-                                                <td className="px-3 py-2 text-foreground">{metric.resolvedSignals}</td>
-                                                <td className="px-3 py-2 text-foreground">{metric.hits}</td>
-                                                <td className="px-3 py-2 text-cyan-300">{formatPercent(metric.hitRate)}</td>
-                                                <td className="px-3 py-2 text-foreground">{formatPercent(metric.avgMfePct)}</td>
-                                                <td className="px-3 py-2 text-rose-300">{formatPercent(metric.avgMaePct)}</td>
-                                                <td className="px-3 py-2 text-foreground">{formatPercent(metric.avgEndReturnPct)}</td>
-                                                <td className="px-3 py-2 text-foreground">
+                                                <td className="px-3 py-3 font-semibold text-foreground">{metric.lookaheadMin}m</td>
+                                                <td className="px-3 py-3 text-foreground">{metric.resolvedSignals}</td>
+                                                <td className="px-3 py-3 text-foreground">{metric.hits}</td>
+                                                <td className="px-3 py-3 text-primary">{formatPercent(metric.hitRate)}</td>
+                                                <td className="px-3 py-3 text-foreground">{formatPercent(metric.avgMfePct)}</td>
+                                                <td className="px-3 py-3 text-rose-300">{formatPercent(metric.avgMaePct)}</td>
+                                                <td className="px-3 py-3 text-foreground">{formatPercent(metric.avgEndReturnPct)}</td>
+                                                <td className="px-3 py-3 text-foreground">
                                                     {metric.avgMinutesToHit === null ? "-" : `${metric.avgMinutesToHit.toFixed(2)}m`}
                                                 </td>
                                             </tr>
@@ -326,35 +335,63 @@ export function StrategyBacktestPanel() {
                             </div>
                         </div>
 
-                        <div>
-                            <div className="text-sm font-semibold text-foreground mb-2">Recent Samples</div>
-                            <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
-                                {result.samples.slice(-8).reverse().map((sample) => (
-                                    <div key={sample.triggeredAt} className="rounded-lg border border-border bg-muted/20 p-3 text-sm">
-                                        <div className="flex items-center justify-between gap-2">
-                                            <span className="font-mono text-xs text-muted-foreground">{new Date(sample.triggeredAt).toLocaleString()}</span>
-                                            <Badge variant={sample.hit ? "secondary" : "outline"}>{sample.hit ? "HIT" : "MISS"}</Badge>
-                                        </div>
-                                        <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-                                            <div>Entry: <span className="font-mono text-foreground">{formatPrice(sample.entryPrice)}</span></div>
-                                            <div>Target: <span className="font-mono text-foreground">{formatPrice(sample.targetPrice)}</span></div>
-                                            <div>MFE: <span className="font-mono text-foreground">{formatPercent(sample.mfePct)}</span></div>
-                                            <div>MAE: <span className="font-mono text-rose-300">{formatPercent(sample.maePct)}</span></div>
-                                            <div>End: <span className="font-mono text-foreground">{formatPercent(sample.endReturnPct)}</span></div>
-                                            <div>Exit Px: <span className="font-mono text-foreground">{formatPrice(sample.endPrice)}</span></div>
-                                        </div>
-                                        <div className="mt-1 text-xs text-muted-foreground">
-                                            {sample.hit
-                                                ? `Reached target in ${sample.minutesToHit?.toFixed(2)} min`
-                                                : "Did not reach target within lookahead"}
-                                        </div>
-                                    </div>
-                                ))}
+                        <div className="space-y-3 rounded-[1.5rem] border border-border/70 bg-background/16 p-5">
+                            <div>
+                                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary/80">Trade Samples</div>
+                                <div className="mt-2 text-base font-semibold text-foreground">Resolved Backtest Events</div>
+                            </div>
+                            <div className="overflow-x-auto rounded-2xl border border-border/70 bg-background/20">
+                                <table className="w-full min-w-[980px] text-xs">
+                                    <thead className="bg-background/60 text-muted-foreground">
+                                        <tr>
+                                            <th className="px-3 py-3 text-left font-semibold uppercase tracking-[0.14em]">Triggered</th>
+                                            <th className="px-3 py-3 text-left font-semibold uppercase tracking-[0.14em]">Entry</th>
+                                            <th className="px-3 py-3 text-left font-semibold uppercase tracking-[0.14em]">Target</th>
+                                            <th className="px-3 py-3 text-left font-semibold uppercase tracking-[0.14em]">Max Price</th>
+                                            <th className="px-3 py-3 text-left font-semibold uppercase tracking-[0.14em]">Max Return</th>
+                                            <th className="px-3 py-3 text-left font-semibold uppercase tracking-[0.14em]">MFE</th>
+                                            <th className="px-3 py-3 text-left font-semibold uppercase tracking-[0.14em]">MAE</th>
+                                            <th className="px-3 py-3 text-left font-semibold uppercase tracking-[0.14em]">End Return</th>
+                                            <th className="px-3 py-3 text-left font-semibold uppercase tracking-[0.14em]">Minutes to Hit</th>
+                                            <th className="px-3 py-3 text-left font-semibold uppercase tracking-[0.14em]">Outcome</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {result.samples.map((sample) => (
+                                            <tr key={`${sample.triggeredAt}-${sample.entryPrice}`} className="border-t border-border/70">
+                                                <td className="px-3 py-3 text-muted-foreground">
+                                                    {new Date(sample.triggeredAt).toLocaleString([], {
+                                                        hour12: false,
+                                                        month: "2-digit",
+                                                        day: "2-digit",
+                                                        hour: "2-digit",
+                                                        minute: "2-digit",
+                                                    })}
+                                                </td>
+                                                <td className="px-3 py-3 font-mono text-foreground">{formatPrice(sample.entryPrice)}</td>
+                                                <td className="px-3 py-3 font-mono text-foreground">{formatPrice(sample.targetPrice)}</td>
+                                                <td className="px-3 py-3 font-mono text-foreground">{formatPrice(sample.maxFuturePrice)}</td>
+                                                <td className="px-3 py-3 text-emerald-300">{formatPercent(sample.maxFutureReturnPct)}</td>
+                                                <td className="px-3 py-3 text-foreground">{formatPercent(sample.mfePct)}</td>
+                                                <td className="px-3 py-3 text-rose-300">{formatPercent(sample.maePct)}</td>
+                                                <td className="px-3 py-3 text-foreground">{formatPercent(sample.endReturnPct)}</td>
+                                                <td className="px-3 py-3 text-foreground">
+                                                    {sample.minutesToHit === null ? "-" : `${sample.minutesToHit.toFixed(2)}m`}
+                                                </td>
+                                                <td className="px-3 py-3">
+                                                    <Badge variant={sample.hit ? "default" : "outline"}>
+                                                        {sample.hit ? "hit" : "open"}
+                                                    </Badge>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
                 )}
             </div>
-        </div>
+        </section>
     );
 }

@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useId, useMemo, useState } from "react";
 import { Activity, Loader2, Pause, Play, Plus, Target, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { usePolling } from "@/hooks/use-polling";
 
 type StrategyType = "pct_change_up" | "pct_change_down" | "breakout_up" | "breakout_down" | "entry_long" | "entry_rebound" | "pullback_to_ma" | "failed_breakdown";
 
@@ -30,6 +31,7 @@ interface Strategy {
 }
 
 const POLL_INTERVAL = 8000;
+const selectClassName = "h-10 w-full rounded-xl border border-input/90 bg-input/70 px-3.5 text-sm text-foreground outline-none transition-[border-color,box-shadow,background-color] focus:border-ring focus:bg-card focus:ring-4 focus:ring-ring/20";
 
 function formatPrice(value: number | string | null): string {
     if (value === null || value === undefined) return "N/A";
@@ -87,7 +89,26 @@ function getStrategyHint(strategyType: StrategyType): string {
     return "Best for trend pullbacks that reclaim moving averages and continue higher.";
 }
 
+function SummaryCard({
+    label,
+    value,
+    detail,
+}: {
+    label: string;
+    value: string;
+    detail: string;
+}) {
+    return (
+        <div className="rounded-[1.35rem] border border-border/70 bg-background/30 p-4 shadow-[inset_0_1px_0_color-mix(in_oklab,var(--color-foreground)_4%,transparent)]">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{label}</div>
+            <div className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-foreground">{value}</div>
+            <div className="mt-1 text-xs text-muted-foreground">{detail}</div>
+        </div>
+    );
+}
+
 export function PriceStrategyManager() {
+    const fieldId = useId();
     const [watchTokens, setWatchTokens] = useState<WatchToken[]>([]);
     const [strategies, setStrategies] = useState<Strategy[]>([]);
     const [loading, setLoading] = useState(true);
@@ -157,13 +178,7 @@ export function PriceStrategyManager() {
         }
     }, [selectedWatchTokenId]);
 
-    useEffect(() => {
-        void fetchAll();
-        const intervalId = window.setInterval(() => {
-            void fetchAll();
-        }, POLL_INTERVAL);
-        return () => window.clearInterval(intervalId);
-    }, [fetchAll]);
+    usePolling(fetchAll, { intervalMs: POLL_INTERVAL });
 
     const activeTokenCount = useMemo(
         () => watchTokens.filter((token) => token.is_active).length,
@@ -485,70 +500,63 @@ export function PriceStrategyManager() {
     };
 
     return (
-        <div className="bg-card border border-border rounded-2xl overflow-hidden transition-colors">
-            <div className="px-6 py-4 border-b border-border bg-muted/30 flex items-center justify-between">
-                <div>
-                    <h2 className="text-lg font-semibold text-foreground">Price Strategy Center</h2>
-                    <p className="text-xs text-muted-foreground mt-1">
-                        Operate the watchlist, compose strategies, and keep the active registry readable.
+        <section className="overflow-hidden rounded-[1.9rem] border border-border/70 bg-card/86 shadow-[inset_0_1px_0_color-mix(in_oklab,var(--color-foreground)_4%,transparent),0_24px_80px_-46px_rgba(0,0,0,0.95)] transition-colors">
+            <div className="flex items-start justify-between gap-4 border-b border-border/70 bg-[linear-gradient(145deg,color-mix(in_oklab,var(--color-card)_94%,transparent),color-mix(in_oklab,var(--color-primary)_7%,transparent))] px-6 py-5">
+                <div className="min-w-0">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary/80">
+                        Execution Layer
+                    </div>
+                    <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-foreground">Price Strategy Center</h2>
+                    <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+                        Operate the watchlist, compose strategies, and keep the active registry readable without turning the interface into a dense admin form.
                     </p>
                 </div>
-                {loading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
+                <div className="flex items-center gap-2 rounded-full border border-border/70 bg-background/35 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" /> : <Activity className="w-3.5 h-3.5 text-primary" />}
+                    {loading ? "Syncing" : "Ready"}
+                </div>
             </div>
 
             {errorMessage && (
-                <div className="mx-6 mt-4 rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+                <div className="mx-6 mt-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
                     {errorMessage}
                 </div>
             )}
 
-            <div className="p-6 space-y-6">
-                <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-                    <div className="rounded-xl border border-border/70 bg-muted/15 p-4">
-                        <div className="text-[11px] text-muted-foreground">Watch Tokens</div>
-                        <div className="mt-2 text-2xl font-semibold text-foreground">{watchTokens.length}</div>
-                        <div className="mt-1 text-xs text-muted-foreground">{activeTokenCount} active</div>
-                    </div>
-                    <div className="rounded-xl border border-border/70 bg-muted/15 p-4">
-                        <div className="text-[11px] text-muted-foreground">Strategies</div>
-                        <div className="mt-2 text-2xl font-semibold text-foreground">{strategies.length}</div>
-                        <div className="mt-1 text-xs text-muted-foreground">{activeStrategyCount} running</div>
-                    </div>
-                    <div className="rounded-xl border border-border/70 bg-muted/15 p-4">
-                        <div className="text-[11px] text-muted-foreground">Selected Token</div>
-                        <div className="mt-2 text-base font-semibold text-foreground">
-                            {selectedToken?.symbol || selectedToken?.name || "None"}
-                        </div>
-                        <div className="mt-1 text-xs text-muted-foreground">
-                            {selectedToken ? `${selectedTokenStrategyCount} strategies attached` : "Pick a token from the watchlist"}
-                        </div>
-                    </div>
-                    <div className="rounded-xl border border-border/70 bg-muted/15 p-4">
-                        <div className="text-[11px] text-muted-foreground">Last Price</div>
-                        <div className="mt-2 text-base font-semibold text-foreground">
-                            {selectedToken ? formatPrice(selectedToken.last_price) : "N/A"}
-                        </div>
-                        <div className="mt-1 text-xs text-muted-foreground">
-                            {selectedToken?.mint ? `${selectedToken.mint.slice(0, 6)}...${selectedToken.mint.slice(-4)}` : "No token selected"}
-                        </div>
-                    </div>
+            <div className="space-y-6 p-6">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <SummaryCard label="Watch Tokens" value={watchTokens.length.toString()} detail={`${activeTokenCount} active`} />
+                    <SummaryCard label="Strategies" value={strategies.length.toString()} detail={`${activeStrategyCount} running`} />
+                    <SummaryCard
+                        label="Selected Token"
+                        value={selectedToken?.symbol || selectedToken?.name || "None"}
+                        detail={selectedToken ? `${selectedTokenStrategyCount} strategies attached` : "Pick a token from the watchlist"}
+                    />
+                    <SummaryCard
+                        label="Last Price"
+                        value={selectedToken ? formatPrice(selectedToken.last_price) : "N/A"}
+                        detail={selectedToken?.mint ? `${selectedToken.mint.slice(0, 6)}...${selectedToken.mint.slice(-4)}` : "No token selected"}
+                    />
                 </div>
 
-                <div className="grid grid-cols-1 xl:grid-cols-[280px_minmax(0,1fr)_360px] gap-6">
-                    <section className="space-y-4 xl:pr-6 xl:border-r xl:border-border">
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)] 2xl:grid-cols-[290px_minmax(0,1fr)_360px]">
+                    <section className="space-y-4 rounded-[1.5rem] border border-border/70 bg-background/16 p-5">
                         <div className="space-y-1">
-                            <h3 className="text-sm font-semibold text-foreground">Watchlist</h3>
-                            <p className="text-xs text-muted-foreground">
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary/80">Selection</div>
+                            <h3 className="text-base font-semibold text-foreground">Watchlist</h3>
+                            <p className="text-sm leading-6 text-muted-foreground">
                                 Keep selection simple here, then build or review strategies against the chosen token.
                             </p>
                         </div>
 
                         <form onSubmit={handleAddWatchToken} className="flex gap-2">
                             <Input
+                                id={`${fieldId}-mint-input`}
                                 placeholder="Token mint address..."
                                 value={mintInput}
                                 onChange={(event) => setMintInput(event.target.value)}
                                 className="font-mono text-xs"
+                                aria-label="Token mint address"
                             />
                             <Button type="submit" size="sm" disabled={busyAction === "add-token"}>
                                 {busyAction === "add-token" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
@@ -558,7 +566,7 @@ export function PriceStrategyManager() {
 
                         <div className="space-y-2 max-h-[560px] overflow-y-auto pr-1">
                             {watchTokens.length === 0 && !loading && (
-                                <div className="rounded-xl border border-dashed border-border px-4 py-6 text-xs text-muted-foreground">
+                                <div className="rounded-2xl border border-dashed border-border/70 px-4 py-6 text-sm text-muted-foreground">
                                     No watch tokens yet. Add a mint to start the strategy workflow.
                                 </div>
                             )}
@@ -570,10 +578,10 @@ export function PriceStrategyManager() {
                                 return (
                                     <div
                                         key={token.id}
-                                        className={`rounded-xl border p-3 transition-colors ${
+                                        className={`rounded-[1.2rem] border p-3 transition-colors ${
                                             isSelected
-                                                ? "border-violet-500/40 bg-violet-500/10"
-                                                : "border-border/70 bg-muted/10 hover:bg-muted/20"
+                                                ? "border-primary/35 bg-primary/10 shadow-[0_0_0_1px_color-mix(in_oklab,var(--color-primary)_18%,transparent)]"
+                                                : "border-border/70 bg-background/30 hover:bg-accent/20"
                                         }`}
                                     >
                                         <div className="flex items-start gap-2">
@@ -584,7 +592,7 @@ export function PriceStrategyManager() {
                                             >
                                                 <div className="flex items-center gap-2 flex-wrap">
                                                     <span className="text-sm font-semibold text-foreground">{token.symbol || "TOKEN"}</span>
-                                                    <Badge variant={token.is_active ? "secondary" : "outline"}>
+                                                    <Badge variant={token.is_active ? "default" : "outline"}>
                                                         {token.is_active ? "ACTIVE" : "PAUSED"}
                                                     </Badge>
                                                     <Badge variant="outline">{strategyCount} strategies</Badge>
@@ -600,6 +608,7 @@ export function PriceStrategyManager() {
                                                     variant="ghost"
                                                     size="icon-xs"
                                                     title={token.is_active ? "Pause token" : "Activate token"}
+                                                    aria-label={token.is_active ? `Pause ${token.symbol || token.mint}` : `Activate ${token.symbol || token.mint}`}
                                                     onClick={() => toggleWatchToken(token)}
                                                     disabled={busyAction === `token-toggle-${token.id}`}
                                                 >
@@ -615,6 +624,7 @@ export function PriceStrategyManager() {
                                                     variant="ghost"
                                                     size="icon-xs"
                                                     title="Delete token"
+                                                    aria-label={`Delete ${token.symbol || token.mint}`}
                                                     onClick={() => deleteWatchToken(token)}
                                                     disabled={busyAction === `token-delete-${token.id}`}
                                                 >
@@ -632,25 +642,26 @@ export function PriceStrategyManager() {
                         </div>
                     </section>
 
-                    <section className="space-y-4 min-w-0">
+                    <section className="min-w-0 space-y-4 rounded-[1.5rem] border border-border/70 bg-background/16 p-5">
                         <div className="space-y-1">
-                            <h3 className="text-sm font-semibold text-foreground">Strategy Composer</h3>
-                            <p className="text-xs text-muted-foreground">
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary/80">Manual Build</div>
+                            <h3 className="text-base font-semibold text-foreground">Strategy Composer</h3>
+                            <p className="text-sm leading-6 text-muted-foreground">
                                 Build a manual strategy for the selected token without losing context to a crowded form.
                             </p>
                         </div>
 
-                        <div className="rounded-xl border border-border/70 bg-muted/10 p-4">
+                        <div className="rounded-[1.25rem] border border-border/70 bg-background/30 p-4">
                             <div className="flex flex-wrap items-center justify-between gap-3">
                                 <div>
-                                    <div className="text-[11px] text-muted-foreground">Selected token</div>
+                                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Selected token</div>
                                     <div className="text-base font-semibold text-foreground">
                                         {selectedToken?.symbol || selectedToken?.name || "Choose a token"}
                                     </div>
                                 </div>
                                 {selectedToken && (
                                     <div className="text-right">
-                                        <div className="text-[11px] text-muted-foreground">Last price</div>
+                                        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Last price</div>
                                         <div className="text-sm font-semibold text-foreground">{formatPrice(selectedToken.last_price)}</div>
                                     </div>
                                 )}
@@ -662,14 +673,15 @@ export function PriceStrategyManager() {
                             )}
                         </div>
 
-                        <form onSubmit={handleAddStrategy} className="space-y-5 rounded-2xl border border-border/70 bg-muted/10 p-5">
+                        <form onSubmit={handleAddStrategy} className="space-y-5 rounded-[1.25rem] border border-border/60 bg-background/18 p-5">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="text-[11px] text-muted-foreground block mb-1">Watch Token</label>
+                                    <label htmlFor={`${fieldId}-watch-token`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Watch Token</label>
                                     <select
+                                        id={`${fieldId}-watch-token`}
                                         value={selectedWatchTokenId}
                                         onChange={(event) => setSelectedWatchTokenId(event.target.value)}
-                                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                        className={selectClassName}
                                     >
                                         <option value="">Select token</option>
                                         {watchTokens.map((token) => (
@@ -681,11 +693,12 @@ export function PriceStrategyManager() {
                                 </div>
 
                                 <div>
-                                    <label className="text-[11px] text-muted-foreground block mb-1">Strategy Type</label>
+                                    <label htmlFor={`${fieldId}-strategy-type`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Strategy Type</label>
                                     <select
+                                        id={`${fieldId}-strategy-type`}
                                         value={strategyType}
                                         onChange={(event) => setStrategyType(event.target.value as StrategyType)}
-                                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                        className={selectClassName}
                                     >
                                         <option value="pct_change_up">pct_change_up</option>
                                         <option value="pct_change_down">pct_change_down</option>
@@ -699,17 +712,18 @@ export function PriceStrategyManager() {
                                 </div>
                             </div>
 
-                            <div className="rounded-xl border border-border/60 bg-background/50 p-4">
+                            <div className="rounded-[1.2rem] border border-border/70 bg-[linear-gradient(145deg,color-mix(in_oklab,var(--color-card)_88%,transparent),color-mix(in_oklab,var(--color-primary)_8%,transparent))] p-4">
                                 <div className="flex items-center gap-2">
-                                    <Target className="w-4 h-4 text-violet-400" />
+                                    <Target className="w-4 h-4 text-primary" />
                                     <div className="text-sm font-semibold text-foreground">{getStrategyTypeLabel(strategyType)}</div>
                                 </div>
                                 <p className="mt-2 text-xs text-muted-foreground">{getStrategyHint(strategyType)}</p>
                             </div>
 
                             <div>
-                                <label className="text-[11px] text-muted-foreground block mb-1">Strategy Name (optional)</label>
+                                <label htmlFor={`${fieldId}-strategy-name`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Strategy Name (optional)</label>
                                 <Input
+                                    id={`${fieldId}-strategy-name`}
                                     value={strategyName}
                                     onChange={(event) => setStrategyName(event.target.value)}
                                     placeholder="e.g. 5m Pump Alert"
@@ -719,41 +733,41 @@ export function PriceStrategyManager() {
                             {(strategyType === "pct_change_up" || strategyType === "pct_change_down") ? (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
-                                        <label className="text-[11px] text-muted-foreground block mb-1">Window (min)</label>
-                                        <Input value={windowMin} onChange={(event) => setWindowMin(event.target.value)} />
+                                        <label htmlFor={`${fieldId}-window-min`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Window (min)</label>
+                                        <Input id={`${fieldId}-window-min`} value={windowMin} onChange={(event) => setWindowMin(event.target.value)} />
                                     </div>
                                     <div>
-                                        <label className="text-[11px] text-muted-foreground block mb-1">Threshold (%)</label>
-                                        <Input value={thresholdPct} onChange={(event) => setThresholdPct(event.target.value)} />
+                                        <label htmlFor={`${fieldId}-threshold-pct`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Threshold (%)</label>
+                                        <Input id={`${fieldId}-threshold-pct`} value={thresholdPct} onChange={(event) => setThresholdPct(event.target.value)} />
                                     </div>
                                 </div>
                             ) : (strategyType === "entry_long" || strategyType === "entry_rebound" || strategyType === "pullback_to_ma" || strategyType === "failed_breakdown") ? (
                                 <div className="space-y-4">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
-                                            <label className="text-[11px] text-muted-foreground block mb-1">Lookback (min)</label>
-                                            <Input value={lookbackMin} onChange={(event) => setLookbackMin(event.target.value)} />
+                                            <label htmlFor={`${fieldId}-lookback-min`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Lookback (min)</label>
+                                            <Input id={`${fieldId}-lookback-min`} value={lookbackMin} onChange={(event) => setLookbackMin(event.target.value)} />
                                         </div>
                                         <div>
-                                            <label className="text-[11px] text-muted-foreground block mb-1">Target (%)</label>
-                                            <Input value={entryTargetPct} onChange={(event) => setEntryTargetPct(event.target.value)} />
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="text-[11px] text-muted-foreground block mb-1">Fast MA (min)</label>
-                                            <Input value={fastWindowMin} onChange={(event) => setFastWindowMin(event.target.value)} />
-                                        </div>
-                                        <div>
-                                            <label className="text-[11px] text-muted-foreground block mb-1">Slow MA (min)</label>
-                                            <Input value={slowWindowMin} onChange={(event) => setSlowWindowMin(event.target.value)} />
+                                            <label htmlFor={`${fieldId}-entry-target-pct`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Target (%)</label>
+                                            <Input id={`${fieldId}-entry-target-pct`} value={entryTargetPct} onChange={(event) => setEntryTargetPct(event.target.value)} />
                                         </div>
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
-                                            <label className="text-[11px] text-muted-foreground block mb-1">
+                                            <label htmlFor={`${fieldId}-fast-window-min`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Fast MA (min)</label>
+                                            <Input id={`${fieldId}-fast-window-min`} value={fastWindowMin} onChange={(event) => setFastWindowMin(event.target.value)} />
+                                        </div>
+                                        <div>
+                                            <label htmlFor={`${fieldId}-slow-window-min`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Slow MA (min)</label>
+                                            <Input id={`${fieldId}-slow-window-min`} value={slowWindowMin} onChange={(event) => setSlowWindowMin(event.target.value)} />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label htmlFor={`${fieldId}-dynamic-primary`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                                                 {strategyType === "entry_long"
                                                     ? "Breakout Tolerance (%)"
                                                     : strategyType === "entry_rebound"
@@ -763,6 +777,7 @@ export function PriceStrategyManager() {
                                                         : "Pullback Tolerance (%)"}
                                             </label>
                                             <Input
+                                                id={`${fieldId}-dynamic-primary`}
                                                 value={strategyType === "entry_long"
                                                     ? breakoutTolerancePct
                                                     : strategyType === "entry_rebound"
@@ -780,7 +795,7 @@ export function PriceStrategyManager() {
                                             />
                                         </div>
                                         <div>
-                                            <label className="text-[11px] text-muted-foreground block mb-1">
+                                            <label htmlFor={`${fieldId}-dynamic-secondary`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                                                 {strategyType === "entry_long"
                                                     ? "Min Trend (%)"
                                                     : strategyType === "entry_rebound"
@@ -790,6 +805,7 @@ export function PriceStrategyManager() {
                                                         : "Min Trend (%)"}
                                             </label>
                                             <Input
+                                                id={`${fieldId}-dynamic-secondary`}
                                                 value={strategyType === "entry_long"
                                                     ? minTrendPct
                                                     : strategyType === "entry_rebound"
@@ -811,10 +827,10 @@ export function PriceStrategyManager() {
                                     {strategyType === "failed_breakdown" && (
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <div>
-                                                <label className="text-[11px] text-muted-foreground block mb-1">Min Drawdown (%)</label>
-                                                <Input value={minDrawdownPct} onChange={(event) => setMinDrawdownPct(event.target.value)} />
+                                                <label htmlFor={`${fieldId}-min-drawdown-pct`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Min Drawdown (%)</label>
+                                                <Input id={`${fieldId}-min-drawdown-pct`} value={minDrawdownPct} onChange={(event) => setMinDrawdownPct(event.target.value)} />
                                             </div>
-                                            <div className="rounded-xl border border-dashed border-border/70 px-3 py-2 text-[11px] text-muted-foreground">
+                                            <div className="rounded-[1.1rem] border border-dashed border-border/70 bg-background/24 px-3 py-2 text-[11px] text-muted-foreground">
                                                 Experimental bottom model: previous sample must sit near the local low, then current price reclaims above fast MA.
                                             </div>
                                         </div>
@@ -822,19 +838,20 @@ export function PriceStrategyManager() {
                                 </div>
                             ) : (
                                 <div>
-                                    <label className="text-[11px] text-muted-foreground block mb-1">Target Price ($)</label>
-                                    <Input value={targetPrice} onChange={(event) => setTargetPrice(event.target.value)} />
+                                    <label htmlFor={`${fieldId}-target-price`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Target Price ($)</label>
+                                    <Input id={`${fieldId}-target-price`} value={targetPrice} onChange={(event) => setTargetPrice(event.target.value)} />
                                 </div>
                             )}
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="text-[11px] text-muted-foreground block mb-1">Cooldown (sec)</label>
-                                    <Input value={cooldownSec} onChange={(event) => setCooldownSec(event.target.value)} />
+                                    <label htmlFor={`${fieldId}-cooldown-sec`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Cooldown (sec)</label>
+                                    <Input id={`${fieldId}-cooldown-sec`} value={cooldownSec} onChange={(event) => setCooldownSec(event.target.value)} />
                                 </div>
                                 <div>
-                                    <label className="text-[11px] text-muted-foreground block mb-1">Chat ID (optional)</label>
+                                    <label htmlFor={`${fieldId}-chat-id`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Chat ID (optional)</label>
                                     <Input
+                                        id={`${fieldId}-chat-id`}
                                         value={chatId}
                                         onChange={(event) => setChatId(event.target.value)}
                                         placeholder="default from env if empty"
@@ -851,32 +868,35 @@ export function PriceStrategyManager() {
                         </form>
                     </section>
 
-                    <section className="space-y-4 xl:pl-6 xl:border-l xl:border-border">
+                    <section className="space-y-4 rounded-[1.5rem] border border-border/70 bg-background/16 p-5">
                         <div className="space-y-1">
-                            <h3 className="text-sm font-semibold text-foreground">Strategy Registry</h3>
-                            <p className="text-xs text-muted-foreground">
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary/80">Live Registry</div>
+                            <h3 className="text-base font-semibold text-foreground">Strategy Registry</h3>
+                            <p className="text-sm leading-6 text-muted-foreground">
                                 Review only what matters right now instead of scanning one long mixed list.
                             </p>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <div>
-                                <label className="text-[11px] text-muted-foreground block mb-1">Scope</label>
+                                <label htmlFor={`${fieldId}-strategy-scope`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Scope</label>
                                 <select
+                                    id={`${fieldId}-strategy-scope`}
                                     value={strategyListScope}
                                     onChange={(event) => setStrategyListScope(event.target.value as "selected" | "all")}
-                                    className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    className={selectClassName}
                                 >
                                     <option value="selected">Selected token</option>
                                     <option value="all">All tokens</option>
                                 </select>
                             </div>
                             <div>
-                                <label className="text-[11px] text-muted-foreground block mb-1">Status</label>
+                                <label htmlFor={`${fieldId}-strategy-status`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Status</label>
                                 <select
+                                    id={`${fieldId}-strategy-status`}
                                     value={strategyStatusFilter}
                                     onChange={(event) => setStrategyStatusFilter(event.target.value as "active" | "all")}
-                                    className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    className={selectClassName}
                                 >
                                     <option value="all">All strategies</option>
                                     <option value="active">Active only</option>
@@ -884,20 +904,20 @@ export function PriceStrategyManager() {
                             </div>
                         </div>
 
-                        <div className="rounded-xl border border-border/70 bg-muted/10 p-4 flex items-center justify-between gap-3">
+                        <div className="flex items-center justify-between gap-3 rounded-[1.25rem] border border-border/70 bg-background/30 p-4">
                             <div>
-                                <div className="text-[11px] text-muted-foreground">Visible strategies</div>
+                                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Visible strategies</div>
                                 <div className="text-lg font-semibold text-foreground">{filteredStrategies.length}</div>
                             </div>
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                <Activity className="w-4 h-4 text-violet-400" />
+                                <Activity className="w-4 h-4 text-primary" />
                                 {strategyStatusFilter === "active" ? "Focused on live signals" : "Showing all saved rules"}
                             </div>
                         </div>
 
                         <div className="space-y-3 max-h-[560px] overflow-y-auto pr-1">
                             {filteredStrategies.length === 0 && !loading && (
-                                <div className="rounded-xl border border-dashed border-border px-4 py-6 text-xs text-muted-foreground">
+                                <div className="rounded-2xl border border-dashed border-border/70 px-4 py-6 text-sm text-muted-foreground">
                                     No strategies match the current filter. Try switching scope or creating one from the composer.
                                 </div>
                             )}
@@ -907,12 +927,12 @@ export function PriceStrategyManager() {
                                 const paramEntries = Object.entries(strategy.params || {}).slice(0, 6);
 
                                 return (
-                                    <div key={strategy.id} className="rounded-xl border border-border/70 bg-muted/10 p-4">
+                                    <div key={strategy.id} className="rounded-[1.25rem] border border-border/70 bg-background/30 p-4">
                                         <div className="flex items-start justify-between gap-3">
                                             <div className="min-w-0">
                                                 <div className="flex items-center gap-2 flex-wrap">
                                                     <span className="text-sm font-semibold text-foreground truncate">{strategy.name}</span>
-                                                    <Badge variant={strategy.is_active ? "secondary" : "outline"}>
+                                                    <Badge variant={strategy.is_active ? "default" : "outline"}>
                                                         {strategy.is_active ? "RUNNING" : "PAUSED"}
                                                     </Badge>
                                                     <Badge variant="outline">{getStrategyTypeLabel(strategy.type)}</Badge>
@@ -930,6 +950,7 @@ export function PriceStrategyManager() {
                                                     variant="ghost"
                                                     size="icon-xs"
                                                     title={strategy.is_active ? "Pause strategy" : "Enable strategy"}
+                                                    aria-label={strategy.is_active ? `Pause strategy ${strategy.name}` : `Enable strategy ${strategy.name}`}
                                                     onClick={() => toggleStrategy(strategy)}
                                                     disabled={busyAction === `strategy-toggle-${strategy.id}`}
                                                 >
@@ -945,6 +966,7 @@ export function PriceStrategyManager() {
                                                     variant="ghost"
                                                     size="icon-xs"
                                                     title="Delete strategy"
+                                                    aria-label={`Delete strategy ${strategy.name}`}
                                                     onClick={() => deleteStrategy(strategy)}
                                                     disabled={busyAction === `strategy-delete-${strategy.id}`}
                                                 >
@@ -962,7 +984,7 @@ export function PriceStrategyManager() {
                                                 {paramEntries.map(([key, value]) => (
                                                     <span
                                                         key={`${strategy.id}-${key}`}
-                                                        className="rounded-full border border-border/70 bg-background/60 px-2.5 py-1 text-[11px] text-muted-foreground"
+                                                        className="rounded-full border border-border/70 bg-background/70 px-2.5 py-1 text-[11px] text-muted-foreground"
                                                     >
                                                         <span className="text-foreground">{key}</span> {formatParamValue(value)}
                                                     </span>
@@ -976,6 +998,6 @@ export function PriceStrategyManager() {
                     </section>
                 </div>
             </div>
-        </div>
+        </section>
     );
 }

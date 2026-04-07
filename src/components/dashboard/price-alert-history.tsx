@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
+import { usePolling } from "@/hooks/use-polling";
 import { Loader2, Siren, ExternalLink } from "lucide-react";
 import {
     Table,
@@ -86,34 +87,91 @@ export function PriceAlertHistory() {
         }
     }, []);
 
-    useEffect(() => {
-        fetchAlerts();
-        const interval = setInterval(fetchAlerts, POLL_INTERVAL);
-        return () => clearInterval(interval);
-    }, [fetchAlerts]);
+    usePolling(fetchAlerts, { intervalMs: POLL_INTERVAL });
 
     return (
-        <div className="bg-card border border-border rounded-2xl overflow-hidden transition-colors shadow-none">
-            <div className="px-6 py-4 border-b border-border bg-muted/30 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <Siren className="w-5 h-5 text-rose-400" />
-                    <h2 className="text-lg font-semibold text-foreground">Price Alert History</h2>
+        <section className="overflow-hidden rounded-[1.9rem] border border-border/70 bg-card/86 shadow-[inset_0_1px_0_color-mix(in_oklab,var(--color-foreground)_4%,transparent),0_24px_80px_-46px_rgba(0,0,0,0.95)] transition-colors">
+            <div className="flex items-start justify-between gap-4 border-b border-border/70 bg-[linear-gradient(145deg,color-mix(in_oklab,var(--color-card)_94%,transparent),color-mix(in_oklab,var(--color-primary)_7%,transparent))] px-6 py-5">
+                <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary/80">Alert Log</div>
+                    <div className="mt-2 flex items-center gap-3">
+                        <Siren className="h-5 w-5 text-primary" />
+                        <h2 className="text-2xl font-semibold tracking-[-0.03em] text-foreground">Price Alert History</h2>
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                        Review how strategies have fired over time and inspect the signal context without leaving the dashboard.
+                    </p>
                 </div>
                 {loading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
             </div>
 
             {errorMessage && (
-                <div className="mx-6 mt-4 rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+                <div className="mx-6 mt-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
                     {errorMessage}
                 </div>
             )}
 
-            <div className="p-2 min-h-[260px]">
+            <div className="min-h-[260px] p-4">
                 {alerts.length === 0 && !loading ? (
-                    <div className="p-12 text-center text-muted-foreground text-sm italic transition-colors">
+                    <div className="rounded-2xl border border-dashed border-border/70 p-12 text-center text-sm italic text-muted-foreground transition-colors">
                         No price alerts yet
                     </div>
                 ) : (
+                    <>
+                    <div className="space-y-3 md:hidden">
+                        {alerts.map((row) => {
+                            const symbol = row.token_symbol || `${row.mint.slice(0, 4)}...`;
+                            const summary = summarizeSnapshot(row.snapshot || {});
+                            const currentPrice = formatPrice(row.snapshot?.currentPrice);
+                            const strategyType = row.strategy_type || "unknown";
+                            const isUp = strategyType.includes("up") || strategyType === "entry_long" || strategyType === "entry_rebound" || strategyType === "pullback_to_ma" || strategyType === "failed_breakdown";
+
+                            return (
+                                <article key={row.id} className="rounded-[1.35rem] border border-border/70 bg-background/25 p-4">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <a
+                                                href={`https://dexscreener.com/solana/${row.mint}`}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="flex w-fit items-center gap-1 text-sm font-semibold text-foreground hover:text-primary"
+                                                title="View on DexScreener"
+                                            >
+                                                {symbol}
+                                                <ExternalLink className="w-3 h-3 opacity-60" />
+                                            </a>
+                                            <div className="mt-1 text-[10px] font-mono text-muted-foreground">{row.mint.slice(0, 6)}...{row.mint.slice(-6)}</div>
+                                        </div>
+                                        <Badge variant={isUp ? "default" : "outline"} className="max-w-[12rem] whitespace-normal break-words font-mono">
+                                            {summary}
+                                        </Badge>
+                                    </div>
+                                    <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
+                                        <div>
+                                            <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Strategy</div>
+                                            <div className="mt-1 text-foreground">{row.strategy_name || "Unnamed"}</div>
+                                            <div className="text-[10px] text-muted-foreground">{strategyType}</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Price</div>
+                                            <div className="mt-1 font-mono text-foreground/90">{currentPrice}</div>
+                                        </div>
+                                    </div>
+                                    <div className="mt-4 text-[11px] text-muted-foreground">
+                                        {new Date(row.triggered_at).toLocaleString([], {
+                                            hour12: false,
+                                            month: "2-digit",
+                                            day: "2-digit",
+                                            hour: "2-digit",
+                                            minute: "2-digit",
+                                            second: "2-digit",
+                                        })}
+                                    </div>
+                                </article>
+                            );
+                        })}
+                    </div>
+                    <div className="hidden md:block">
                     <Table>
                         <TableHeader>
                             <TableRow className="border-border hover:bg-transparent">
@@ -140,7 +198,7 @@ export function PriceAlertHistory() {
                                                     href={`https://dexscreener.com/solana/${row.mint}`}
                                                     target="_blank"
                                                     rel="noreferrer"
-                                                    className="text-sm font-semibold text-foreground hover:text-indigo-400 transition-colors w-fit flex items-center gap-1"
+                                                    className="flex w-fit items-center gap-1 text-sm font-semibold text-foreground transition-colors hover:text-primary"
                                                     title="View on DexScreener"
                                                 >
                                                     {symbol}
@@ -160,7 +218,7 @@ export function PriceAlertHistory() {
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            <Badge variant={isUp ? "secondary" : "outline"} className="font-mono">
+                                            <Badge variant={isUp ? "default" : "outline"} className="font-mono">
                                                 {summary}
                                             </Badge>
                                         </TableCell>
@@ -184,8 +242,10 @@ export function PriceAlertHistory() {
                             })}
                         </TableBody>
                     </Table>
+                    </div>
+                    </>
                 )}
             </div>
-        </div>
+        </section>
     );
 }

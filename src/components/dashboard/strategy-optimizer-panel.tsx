@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useId, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2, WandSparkles } from "lucide-react";
+import { usePolling } from "@/hooks/use-polling";
 
 interface WatchTokenOption {
     id: string;
@@ -110,6 +111,7 @@ interface OptimizationJob {
 const POLL_INTERVAL = 10000;
 const JOB_POLL_INTERVAL = 2500;
 const STRATEGY_TYPE_ORDER = ["entry_long", "entry_rebound", "failed_breakdown", "pullback_to_ma"] as const;
+const selectClassName = "h-10 w-full rounded-xl border border-input/90 bg-input/70 px-3.5 text-sm text-foreground outline-none transition-[border-color,box-shadow,background-color] focus:border-ring focus:bg-card focus:ring-4 focus:ring-ring/20";
 
 function formatPercent(value: number | null | undefined): string {
     if (value === null || value === undefined || !Number.isFinite(value)) return "-";
@@ -161,7 +163,26 @@ function RecommendationWindows({ recommendation }: { recommendation: Recommendat
     );
 }
 
+function MetricCard({
+    label,
+    value,
+    detail,
+}: {
+    label: string;
+    value: string;
+    detail: string;
+}) {
+    return (
+        <div className="rounded-[1.25rem] border border-border/70 bg-background/30 p-4 shadow-[inset_0_1px_0_color-mix(in_oklab,var(--color-foreground)_4%,transparent)]">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{label}</div>
+            <div className="mt-2 text-lg font-semibold tracking-[-0.03em] text-foreground">{value}</div>
+            <div className="mt-1 text-xs text-muted-foreground">{detail}</div>
+        </div>
+    );
+}
+
 export function StrategyOptimizerPanel() {
+    const fieldId = useId();
     const [watchTokens, setWatchTokens] = useState<WatchTokenOption[]>([]);
     const [selectedWatchTokenId, setSelectedWatchTokenId] = useState("");
     const [historyDays, setHistoryDays] = useState("30");
@@ -198,13 +219,7 @@ export function StrategyOptimizerPanel() {
         }
     }, [selectedWatchTokenId]);
 
-    useEffect(() => {
-        fetchWatchTokens();
-        const timer = window.setInterval(() => {
-            void fetchWatchTokens();
-        }, POLL_INTERVAL);
-        return () => window.clearInterval(timer);
-    }, [fetchWatchTokens]);
+    usePolling(fetchWatchTokens, { intervalMs: POLL_INTERVAL });
 
     const selectedToken = useMemo(
         () => watchTokens.find((token) => token.id === selectedWatchTokenId) || null,
@@ -242,43 +257,43 @@ export function StrategyOptimizerPanel() {
         }
     }, [result]);
 
-    useEffect(() => {
+    usePolling(async () => {
         if (!activeJob?.id) return;
         if (activeJob.status === "completed" || activeJob.status === "failed") return;
 
-        const timer = window.setInterval(async () => {
-            try {
-                const response = await fetch(`/api/strategy-optimize/jobs/${activeJob.id}`);
-                if (!response.ok) {
-                    const data = await response.json().catch(() => ({}));
-                    throw new Error(data?.error || "Failed to refresh optimization job");
-                }
-
-                const job = await response.json() as OptimizationJob;
-                setActiveJob(job);
-
-                if (job.status === "completed" && job.result_json) {
-                    setResult(job.result_json);
-                    setStatusMessage(
-                        job.result_json.optimization.topRecommendations.length > 0
-                            ? "Optimization finished. Review the recommendations below."
-                            : "Optimization finished, but no viable strategy was found. Try longer history or a smaller interval."
-                    );
-                    setRunning(false);
-                } else if (job.status === "failed") {
-                    setErrorMessage(job.error_message || "Optimization failed");
-                    setRunning(false);
-                } else {
-                    setStatusMessage(job.progress_message || `Optimization ${job.status}...`);
-                }
-            } catch (error: unknown) {
-                setErrorMessage(error instanceof Error ? error.message : "Unknown error");
-                setRunning(false);
+        try {
+            const response = await fetch(`/api/strategy-optimize/jobs/${activeJob.id}`);
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data?.error || "Failed to refresh optimization job");
             }
-        }, JOB_POLL_INTERVAL);
 
-        return () => window.clearInterval(timer);
-    }, [activeJob]);
+            const job = await response.json() as OptimizationJob;
+            setActiveJob(job);
+
+            if (job.status === "completed" && job.result_json) {
+                setResult(job.result_json);
+                setStatusMessage(
+                    job.result_json.optimization.topRecommendations.length > 0
+                        ? "Optimization finished. Review the recommendations below."
+                        : "Optimization finished, but no viable strategy was found. Try longer history or a smaller interval."
+                );
+                setRunning(false);
+            } else if (job.status === "failed") {
+                setErrorMessage(job.error_message || "Optimization failed");
+                setRunning(false);
+            } else {
+                setStatusMessage(job.progress_message || `Optimization ${job.status}...`);
+            }
+        } catch (error: unknown) {
+            setErrorMessage(error instanceof Error ? error.message : "Unknown error");
+            setRunning(false);
+        }
+    }, {
+        enabled: Boolean(activeJob?.id) && activeJob?.status !== "completed" && activeJob?.status !== "failed",
+        intervalMs: JOB_POLL_INTERVAL,
+        runImmediately: false,
+    });
 
     const runOptimization = async () => {
         if (!selectedWatchTokenId) {
@@ -398,150 +413,185 @@ export function StrategyOptimizerPanel() {
     };
 
     return (
-        <div className="bg-card border border-border rounded-2xl overflow-hidden transition-colors shadow-none">
-            <div className="px-6 py-4 border-b border-border bg-muted/30 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <WandSparkles className="w-5 h-5 text-violet-400" />
-                    <div>
-                        <h2 className="text-lg font-semibold text-foreground">Strategy Optimizer</h2>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            Pull external history, test swing entries, then apply the best setup.
-                        </p>
+        <section className="overflow-hidden rounded-[1.9rem] border border-border/70 bg-card/86 shadow-[inset_0_1px_0_color-mix(in_oklab,var(--color-foreground)_4%,transparent),0_24px_80px_-46px_rgba(0,0,0,0.95)] transition-colors">
+            <div className="flex items-start justify-between gap-4 border-b border-border/70 bg-[linear-gradient(145deg,color-mix(in_oklab,var(--color-card)_94%,transparent),color-mix(in_oklab,var(--color-primary)_7%,transparent))] px-6 py-5">
+                <div className="min-w-0">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary/80">
+                        Research Layer
                     </div>
+                    <div className="mt-2 flex items-center gap-3">
+                        <WandSparkles className="h-5 w-5 text-primary" />
+                        <h2 className="text-2xl font-semibold tracking-[-0.03em] text-foreground">Strategy Optimizer</h2>
+                    </div>
+                    <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+                        Pull external history, test swing entries, then surface the strongest setups before pushing them into the live registry.
+                    </p>
                 </div>
-                {loading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
+                <div className="flex items-center gap-2 rounded-full border border-border/70 bg-background/35 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" /> : <WandSparkles className="w-3.5 h-3.5 text-primary" />}
+                    {loading ? "Loading" : "Research ready"}
+                </div>
             </div>
 
             {errorMessage && (
-                <div className="mx-6 mt-4 rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+                <div className="mx-6 mt-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
                     {errorMessage}
                 </div>
             )}
 
             {statusMessage && (
-                <div className="mx-6 mt-4 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
+                <div className="mx-6 mt-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
                     {statusMessage}
                 </div>
             )}
 
-            <div className="p-6 space-y-5">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                    <div className="md:col-span-2">
-                        <label className="text-[11px] text-muted-foreground block mb-1">Watch Token</label>
-                        <select
-                            value={selectedWatchTokenId}
-                            onChange={(event) => setSelectedWatchTokenId(event.target.value)}
-                            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        >
-                            <option value="">Select token</option>
-                            {watchTokens.map((token) => (
-                                <option key={token.id} value={token.id}>
-                                    {token.symbol || "TOKEN"} · {token.mint.slice(0, 6)}...{token.mint.slice(-4)}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="text-[11px] text-muted-foreground block mb-1">History (days)</label>
-                        <Input value={historyDays} onChange={(event) => setHistoryDays(event.target.value)} />
-                    </div>
-                    <div>
-                        <label className="text-[11px] text-muted-foreground block mb-1">Interval</label>
-                        <select
-                            value={interval}
-                            onChange={(event) => setInterval(event.target.value as "5m" | "15m" | "1h")}
-                            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        >
-                            <option value="5m">5m</option>
-                            <option value="15m">15m</option>
-                            <option value="1h">1h</option>
-                        </select>
-                    </div>
-                </div>
+            <div className="space-y-5 p-6">
+                <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,0.9fr)]">
+                    <div className="space-y-4 rounded-[1.5rem] border border-border/70 bg-background/16 p-5">
+                        <div className="space-y-1">
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary/80">Input</div>
+                            <h3 className="text-base font-semibold text-foreground">Optimization Scope</h3>
+                            <p className="text-sm leading-6 text-muted-foreground">
+                                Choose the target token, define the time horizon, then select how aggressive the optimizer should be.
+                            </p>
+                        </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div>
-                        <label className="text-[11px] text-muted-foreground block mb-1">Trading Style</label>
-                        <select
-                            value={style}
-                            onChange={(event) => setStyle(event.target.value as "conservative" | "balanced" | "aggressive")}
-                            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        >
-                            <option value="conservative">conservative</option>
-                            <option value="balanced">balanced</option>
-                            <option value="aggressive">aggressive</option>
-                        </select>
-                    </div>
-                    <div className="md:col-span-2 flex items-end">
-                        <Button onClick={runOptimization} disabled={running || !selectedWatchTokenId}>
-                            {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <WandSparkles className="w-4 h-4" />}
-                            Optimize Strategy
-                        </Button>
-                    </div>
-                </div>
-
-                {selectedToken && (
-                    <div className="text-xs text-muted-foreground">
-                        Target token: <span className="font-semibold text-foreground">{selectedToken.symbol || selectedToken.name || "TOKEN"}</span>
-                        {" · "}
-                        <span className="font-mono">{selectedToken.mint}</span>
-                    </div>
-                )}
-
-                {activeJob && (
-                    <div className="rounded-lg border border-border bg-muted/20 p-4 text-xs">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div>
-                                <div className="text-muted-foreground">Optimization Job</div>
-                                <div className="font-semibold text-foreground">{activeJob.id}</div>
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+                            <div className="md:col-span-2">
+                                <label htmlFor={`${fieldId}-watch-token`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Watch Token</label>
+                                <select
+                                    id={`${fieldId}-watch-token`}
+                                    value={selectedWatchTokenId}
+                                    onChange={(event) => setSelectedWatchTokenId(event.target.value)}
+                                    className={selectClassName}
+                                >
+                                    <option value="">Select token</option>
+                                    {watchTokens.map((token) => (
+                                        <option key={token.id} value={token.id}>
+                                            {token.symbol || "TOKEN"} · {token.mint.slice(0, 6)}...{token.mint.slice(-4)}
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <Badge variant="outline">{activeJob.status}</Badge>
-                                <span className="text-muted-foreground">{activeJob.progress_message || "-"}</span>
+                            <div>
+                                <label htmlFor={`${fieldId}-history-days`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">History (days)</label>
+                                <Input id={`${fieldId}-history-days`} value={historyDays} onChange={(event) => setHistoryDays(event.target.value)} />
+                            </div>
+                            <div>
+                                <label htmlFor={`${fieldId}-interval`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Interval</label>
+                                <select
+                                    id={`${fieldId}-interval`}
+                                    value={interval}
+                                    onChange={(event) => setInterval(event.target.value as "5m" | "15m" | "1h")}
+                                    className={selectClassName}
+                                >
+                                    <option value="5m">5m</option>
+                                    <option value="15m">15m</option>
+                                    <option value="1h">1h</option>
+                                </select>
                             </div>
                         </div>
+
+                        <div className="grid grid-cols-1 items-end gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
+                            <div>
+                                <label htmlFor={`${fieldId}-trading-style`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Trading Style</label>
+                                <select
+                                    id={`${fieldId}-trading-style`}
+                                    value={style}
+                                    onChange={(event) => setStyle(event.target.value as "conservative" | "balanced" | "aggressive")}
+                                    className={selectClassName}
+                                >
+                                    <option value="conservative">conservative</option>
+                                    <option value="balanced">balanced</option>
+                                    <option value="aggressive">aggressive</option>
+                                </select>
+                            </div>
+                            <Button onClick={runOptimization} disabled={running || !selectedWatchTokenId} className="min-w-[13rem]">
+                                {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <WandSparkles className="w-4 h-4" />}
+                                Optimize Strategy
+                            </Button>
+                        </div>
+
+                        {selectedToken && (
+                            <div className="rounded-[1.25rem] border border-border/70 bg-background/30 p-4">
+                                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Target token</div>
+                                <div className="mt-2 text-base font-semibold text-foreground">
+                                    {selectedToken.symbol || selectedToken.name || "TOKEN"}
+                                </div>
+                                <div className="mt-1 break-all text-xs font-mono text-muted-foreground">{selectedToken.mint}</div>
+                            </div>
+                        )}
                     </div>
-                )}
+
+                    <div className="space-y-3 rounded-[1.5rem] border border-border/70 bg-background/16 p-5">
+                        <div className="space-y-1">
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary/80">Run State</div>
+                            <h3 className="text-base font-semibold text-foreground">Optimization Status</h3>
+                        </div>
+
+                        {activeJob ? (
+                            <div className="rounded-[1.25rem] border border-border/70 bg-background/30 p-4 text-sm">
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <div>
+                                        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Job ID</div>
+                                        <div className="mt-2 break-all font-mono text-xs text-foreground">{activeJob.id}</div>
+                                    </div>
+                                    <Badge variant="outline">{activeJob.status}</Badge>
+                                </div>
+                                <div className="mt-4 text-sm text-muted-foreground">
+                                    {activeJob.progress_message || "Queued for processing."}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="rounded-[1.25rem] border border-dashed border-border/70 bg-background/20 p-4 text-sm text-muted-foreground">
+                                No active optimization job. Configure the scope and run a search to populate recommendations.
+                            </div>
+                        )}
+                    </div>
+                </div>
 
                 {result && (
                     <div className="space-y-4">
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            <div className="rounded-lg border border-border bg-muted/20 p-3">
-                                <div className="text-[11px] text-muted-foreground">Provider</div>
-                                <div className="text-base font-semibold text-foreground capitalize">{result.optimization.provider}</div>
-                            </div>
-                            <div className="rounded-lg border border-border bg-muted/20 p-3">
-                                <div className="text-[11px] text-muted-foreground">Candles Used</div>
-                                <div className="text-base font-semibold text-foreground">{result.optimization.pointsUsed}</div>
-                            </div>
-                            <div className="rounded-lg border border-border bg-muted/20 p-3">
-                                <div className="text-[11px] text-muted-foreground">Pool</div>
-                                <div className="text-xs font-mono text-foreground break-all">{result.optimization.poolAddress}</div>
-                            </div>
-                            <div className="rounded-lg border border-border bg-muted/20 p-3">
-                                <div className="text-[11px] text-muted-foreground">Best Overall</div>
-                                <div className="text-base font-semibold text-violet-300">
-                                    {result.optimization.bestOverall ? getStrategyTypeLabel(result.optimization.bestOverall.strategyType) : "-"}
-                                </div>
-                            </div>
+                        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+                            <MetricCard
+                                label="Provider"
+                                value={result.optimization.provider}
+                                detail={result.optimization.poolName || "External market history"}
+                            />
+                            <MetricCard
+                                label="Candles Used"
+                                value={result.optimization.pointsUsed.toString()}
+                                detail={`${result.optimization.historyDays}d at ${result.optimization.interval}`}
+                            />
+                            <MetricCard
+                                label="Pool"
+                                value={result.optimization.poolAddress.slice(0, 8)}
+                                detail={result.optimization.poolAddress}
+                            />
+                            <MetricCard
+                                label="Best Overall"
+                                value={result.optimization.bestOverall ? getStrategyTypeLabel(result.optimization.bestOverall.strategyType) : "-"}
+                                detail={result.optimization.bestOverall ? `score ${result.optimization.bestOverall.score.toFixed(3)}` : "No viable leader yet"}
+                            />
                         </div>
 
                         <div className="space-y-3">
                             {result.optimization.topRecommendations.length === 0 && (
-                                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
+                                <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
                                     No strategy passed the minimum sample threshold for this run. Try `30d + 5m` or `30d + 15m`,
                                     or switch the trading style and re-run optimization.
                                 </div>
                             )}
                             {featuredRecommendations.length > 0 && (
-                                <div className="space-y-3">
-                                    <div>
-                                        <h3 className="text-sm font-semibold text-foreground">Best By Strategy Type</h3>
-                                        <p className="text-xs text-muted-foreground mt-1">
-                                            Each strategy family keeps one independent best setup so you can compare continuation, rebound, bottom-reclaim and pullback styles side by side.
-                                        </p>
-                                    </div>
-                                    <div className="flex justify-end">
+                                <div className="space-y-3 rounded-[1.5rem] border border-border/70 bg-background/16 p-5">
+                                    <div className="flex flex-wrap items-end justify-between gap-3">
+                                        <div>
+                                            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary/80">Featured Setups</div>
+                                            <h3 className="mt-2 text-base font-semibold text-foreground">Best By Strategy Type</h3>
+                                            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                                                Each strategy family keeps one independent best setup so you can compare continuation, rebound, bottom-reclaim and pullback styles side by side.
+                                            </p>
+                                        </div>
                                         <Button
                                             variant="outline"
                                             size="sm"
@@ -552,11 +602,12 @@ export function StrategyOptimizerPanel() {
                                             Apply All Featured
                                         </Button>
                                     </div>
-                                    <div className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-4 gap-3">
+
+                                    <div className="grid grid-cols-1 gap-3 xl:grid-cols-2 2xl:grid-cols-4">
                                         {featuredRecommendations.map((recommendation) => {
                                             const recommendationKey = getRecommendationKey(recommendation);
                                             return (
-                                                <div key={`featured-${recommendationKey}`} className="rounded-lg border border-violet-500/30 bg-violet-500/5 p-4 space-y-3">
+                                                <div key={`featured-${recommendationKey}`} className="space-y-3 rounded-[1.3rem] border border-primary/20 bg-[linear-gradient(145deg,color-mix(in_oklab,var(--color-card)_88%,transparent),color-mix(in_oklab,var(--color-primary)_10%,transparent))] p-4">
                                                     <div className="flex items-center justify-between gap-3">
                                                         <div>
                                                             <div className="text-sm font-semibold text-foreground">{getStrategyTypeLabel(recommendation.strategyType)}</div>
@@ -566,7 +617,7 @@ export function StrategyOptimizerPanel() {
                                                             {recommendation.metrics.resolvedSignals < 4 && (
                                                                 <Badge variant="outline">low sample</Badge>
                                                             )}
-                                                            <Badge variant="secondary">score {recommendation.score.toFixed(3)}</Badge>
+                                                            <Badge variant="default">score {recommendation.score.toFixed(3)}</Badge>
                                                         </div>
                                                     </div>
 
@@ -601,7 +652,7 @@ export function StrategyOptimizerPanel() {
                                                         </div>
                                                     </div>
 
-                                                    <div className="rounded-md border border-border/60 bg-background/40 p-3 text-xs font-mono text-foreground/90 break-all">
+                                                    <div className="rounded-[1rem] border border-border/60 bg-background/40 p-3 text-xs font-mono text-foreground/90 break-all">
                                                         {JSON.stringify(recommendation.params)}
                                                     </div>
 
@@ -629,20 +680,21 @@ export function StrategyOptimizerPanel() {
                             )}
                         </div>
 
-                        <div className="space-y-3">
+                        <div className="space-y-3 rounded-[1.5rem] border border-border/70 bg-background/16 p-5">
                             {result.optimization.topRecommendations.length > 0 && (
                                 <div>
-                                    <h3 className="text-sm font-semibold text-foreground">Overall Leaderboard</h3>
-                                    <p className="text-xs text-muted-foreground mt-1">
+                                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary/80">Ranking View</div>
+                                    <h3 className="mt-2 text-base font-semibold text-foreground">Overall Leaderboard</h3>
+                                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
                                         The combined ranking still exists, but it now starts by surfacing one best setup from each strategy type.
                                     </p>
                                 </div>
                             )}
                             {result.optimization.topRecommendations.map((recommendation) => (
-                                <div key={getRecommendationKey(recommendation)} className="rounded-lg border border-border bg-muted/20 p-4 space-y-3">
+                                <div key={getRecommendationKey(recommendation)} className="space-y-3 rounded-[1.25rem] border border-border/70 bg-background/30 p-4">
                                     <div className="flex items-center justify-between gap-3">
                                         <div className="flex items-center gap-2">
-                                            <Badge variant={recommendation.rank === 1 ? "secondary" : "outline"}>
+                                            <Badge variant={recommendation.rank === 1 ? "default" : "outline"}>
                                                 #{recommendation.rank}
                                             </Badge>
                                             <div>
@@ -655,7 +707,7 @@ export function StrategyOptimizerPanel() {
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3 text-xs">
+                                    <div className="grid grid-cols-2 gap-3 text-xs md:grid-cols-4 xl:grid-cols-7">
                                         <div>
                                             <div className="text-muted-foreground">Lookahead</div>
                                             <div className="font-semibold text-foreground">{recommendation.lookaheadMin}m</div>
@@ -692,7 +744,7 @@ export function StrategyOptimizerPanel() {
                                         </div>
                                     </div>
 
-                                    <div className="rounded-md border border-border/60 bg-background/40 p-3 text-xs font-mono text-foreground/90 break-all">
+                                    <div className="rounded-[1rem] border border-border/60 bg-background/40 p-3 text-xs font-mono text-foreground/90 break-all">
                                         {JSON.stringify(recommendation.params)}
                                     </div>
 
@@ -718,6 +770,6 @@ export function StrategyOptimizerPanel() {
                     </div>
                 )}
             </div>
-        </div>
+        </section>
     );
 }

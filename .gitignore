@@ -24,6 +24,8 @@
 .DS_Store
 *.pem
 .cache/
+.playwright-cli/
+output/
 
 # debug
 npm-debug.log*
