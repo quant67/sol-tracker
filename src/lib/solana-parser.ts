@@ -32,6 +32,12 @@ function isBaseAsset(mint: string): boolean {
     return mint in BASE_ASSETS;
 }
 
+function addIfPresent(addresses: Set<string>, value?: string | null) {
+    if (value && typeof value === 'string') {
+        addresses.add(value);
+    }
+}
+
 export function parseHeliusTransaction(tx: any, monitoredWallet?: string, walletLabel?: string): ParseResult {
     const {
         signature,
@@ -41,31 +47,29 @@ export function parseHeliusTransaction(tx: any, monitoredWallet?: string, wallet
         tokenTransfers,
         nativeTransfers,
         timestamp,
-        accountData,
         description
     } = tx;
 
-    // Collect all involved addresses
+    // Only collect user-level wallet candidates.
+    // `accountData.account` is too broad and often contains pool/program/referral accounts,
+    // which can cause us to mis-attribute a swap to the wrong monitored wallet.
     const involvedAddresses = new Set<string>();
-    if (feePayer) involvedAddresses.add(feePayer);
+    addIfPresent(involvedAddresses, feePayer);
 
-    if (accountData && Array.isArray(accountData)) {
-        accountData.forEach((ad: any) => {
-            if (ad.account) involvedAddresses.add(ad.account);
-        });
-    }
     if (nativeTransfers && Array.isArray(nativeTransfers)) {
         nativeTransfers.forEach((nt: any) => {
-            if (nt.fromUser) involvedAddresses.add(nt.fromUser);
-            if (nt.toUser) involvedAddresses.add(nt.toUser);
+            addIfPresent(involvedAddresses, nt.fromUser);
+            addIfPresent(involvedAddresses, nt.toUser);
+            addIfPresent(involvedAddresses, nt.fromUserAccount);
+            addIfPresent(involvedAddresses, nt.toUserAccount);
         });
     }
     if (tokenTransfers && Array.isArray(tokenTransfers)) {
         tokenTransfers.forEach((tt: any) => {
-            if (tt.fromUserAccount) involvedAddresses.add(tt.fromUserAccount);
-            if (tt.toUserAccount) involvedAddresses.add(tt.toUserAccount);
-            if (tt.fromUser) involvedAddresses.add(tt.fromUser);
-            if (tt.toUser) involvedAddresses.add(tt.toUser);
+            addIfPresent(involvedAddresses, tt.fromUserAccount);
+            addIfPresent(involvedAddresses, tt.toUserAccount);
+            addIfPresent(involvedAddresses, tt.fromUser);
+            addIfPresent(involvedAddresses, tt.toUser);
         });
     }
 
@@ -166,8 +170,10 @@ export function parseHeliusTransaction(tx: any, monitoredWallet?: string, wallet
     } else if (nativeTransfers && Array.isArray(nativeTransfers)) {
         // Fall back to native SOL transfers
         nativeTransfers.forEach((nt: any) => {
-            if (nt.fromUser === wallet || nt.fromUser === feePayer ||
-                nt.toUser === wallet || nt.toUser === feePayer) {
+            const fromUser = nt.fromUser || nt.fromUserAccount;
+            const toUser = nt.toUser || nt.toUserAccount;
+            if (fromUser === wallet || fromUser === feePayer ||
+                toUser === wallet || toUser === feePayer) {
                 costAmount += Math.abs(nt.amount || 0) / 1_000_000_000;
             }
         });
