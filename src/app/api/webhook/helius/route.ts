@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { parseHeliusTransaction } from '@/lib/solana-parser';
 import { sendTelegramAlert, formatSwapAlert } from '@/lib/telegram';
 import { logToFile } from '@/lib/logger';
+import { ensureAutoPulseRetestStrategy } from '@/lib/auto-pulse-strategy';
 
 // In-memory dedup
 const processedSignatures = new Set<string>();
@@ -135,6 +136,21 @@ export async function POST(req: NextRequest) {
                 }
             } else {
                 logToFile(`✅ DB insert success: ${signature.slice(0, 8)}`, 'SUCCESS');
+
+                if (String(swap.type).toUpperCase() === 'BUY') {
+                    const autoStrategy = await ensureAutoPulseRetestStrategy({
+                        mint: swap.tokenMint,
+                        symbol: tokenInfoData.symbol,
+                        name: tokenInfoData.name,
+                    });
+
+                    if (autoStrategy.reason === 'below_threshold') {
+                        logToFile(
+                            `Auto pulse pending: ${swap.tokenMint.slice(0, 8)} buyers=${autoStrategy.buyerCount}`,
+                            'INFO'
+                        );
+                    }
+                }
             }
 
             // Send Telegram alert

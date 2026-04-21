@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useCallback, useId, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { Activity, Loader2, Pause, Play, Plus, Target, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { usePolling } from "@/hooks/use-polling";
 
-type StrategyType = "pct_change_up" | "pct_change_down" | "breakout_up" | "breakout_down" | "entry_long" | "entry_rebound" | "pullback_to_ma" | "failed_breakdown";
+type StrategyType = "pct_change_up" | "pct_change_down" | "breakout_up" | "breakout_down" | "entry_long" | "entry_rebound" | "pullback_to_ma" | "failed_breakdown" | "pulse_retrace_retest";
 
 interface WatchToken {
     id: string;
@@ -67,6 +67,7 @@ function getStrategyTypeLabel(strategyType: StrategyType): string {
     if (strategyType === "entry_long") return "Trend Continuation";
     if (strategyType === "entry_rebound") return "Local Rebound";
     if (strategyType === "failed_breakdown") return "Failed Breakdown";
+    if (strategyType === "pulse_retrace_retest") return "Pulse Retest";
     return "Pullback To MA";
 }
 
@@ -85,6 +86,9 @@ function getStrategyHint(strategyType: StrategyType): string {
     }
     if (strategyType === "failed_breakdown") {
         return "Experimental bottom signal for deep pullbacks that fail to break down and quickly reclaim structure.";
+    }
+    if (strategyType === "pulse_retrace_retest") {
+        return "Detects monitored-buy pulse moves that bleed back into the prior launch zone.";
     }
     return "Best for trend pullbacks that reclaim moving averages and continue higher.";
 }
@@ -136,6 +140,15 @@ export function PriceStrategyManager() {
     const [pullbackTolerancePct, setPullbackTolerancePct] = useState("1.5");
     const [reclaimPct, setReclaimPct] = useState("1");
     const [minDrawdownPct, setMinDrawdownPct] = useState("12");
+    const [buyClusterWindowMin, setBuyClusterWindowMin] = useState("30");
+    const [pulseWindowMin, setPulseWindowMin] = useState("120");
+    const [minPulsePct, setMinPulsePct] = useState("60");
+    const [minBleedMin, setMinBleedMin] = useState("180");
+    const [minRetraceFromHighPct, setMinRetraceFromHighPct] = useState("35");
+    const [retestTolerancePct, setRetestTolerancePct] = useState("8");
+    const [undercutPct, setUndercutPct] = useState("12");
+    const [minBuyerCount, setMinBuyerCount] = useState("1");
+    const [maxNewHighPct, setMaxNewHighPct] = useState("10");
     const [cooldownSec, setCooldownSec] = useState("300");
     const [chatId, setChatId] = useState("");
 
@@ -225,6 +238,12 @@ export function PriceStrategyManager() {
     const selectedTokenStrategyCount = selectedWatchTokenId
         ? strategies.filter((strategy) => strategy.watch_token_id === selectedWatchTokenId).length
         : 0;
+
+    useEffect(() => {
+        if (strategyType === "pulse_retrace_retest" && cooldownSec === "300") {
+            setCooldownSec("21600");
+        }
+    }, [cooldownSec, strategyType]);
 
     const handleAddWatchToken = async (event: React.FormEvent) => {
         event.preventDefault();
@@ -424,6 +443,46 @@ export function PriceStrategyManager() {
                 reclaimPct: reclaimNum,
                 maxDistanceFromLowPct: maxDistanceNum,
                 minDrawdownPct: drawdownNum,
+            };
+        } else if (strategyType === "pulse_retrace_retest") {
+            const lookbackNum = Number(lookbackMin || "0");
+            const clusterNum = Number(buyClusterWindowMin || "0");
+            const pulseWindowNum = Number(pulseWindowMin || "0");
+            const pulsePctNum = Number(minPulsePct || "0");
+            const bleedNum = Number(minBleedMin || "0");
+            const retraceNum = Number(minRetraceFromHighPct || "0");
+            const retestNum = Number(retestTolerancePct || "0");
+            const undercutNum = Number(undercutPct || "0");
+            const buyerCountNum = Number(minBuyerCount || "0");
+            const newHighNum = Number(maxNewHighPct || "0");
+
+            if (
+                !Number.isFinite(lookbackNum) || lookbackNum <= 0 ||
+                !Number.isFinite(clusterNum) || clusterNum <= 0 ||
+                !Number.isFinite(pulseWindowNum) || pulseWindowNum <= 0 ||
+                !Number.isFinite(pulsePctNum) || pulsePctNum <= 0 ||
+                !Number.isFinite(bleedNum) || bleedNum <= 0 ||
+                !Number.isFinite(retraceNum) || retraceNum < 0 ||
+                !Number.isFinite(retestNum) || retestNum < 0 ||
+                !Number.isFinite(undercutNum) || undercutNum < 0 ||
+                !Number.isFinite(buyerCountNum) || buyerCountNum <= 0 ||
+                !Number.isFinite(newHighNum) || newHighNum < 0
+            ) {
+                setErrorMessage("Pulse retest parameters must be valid positive numbers.");
+                return;
+            }
+
+            params = {
+                lookbackMin: lookbackNum,
+                buyClusterWindowMin: clusterNum,
+                pulseWindowMin: pulseWindowNum,
+                minPulsePct: pulsePctNum,
+                minBleedMin: bleedNum,
+                minRetraceFromHighPct: retraceNum,
+                retestTolerancePct: retestNum,
+                undercutPct: undercutNum,
+                minBuyerCount: Math.floor(buyerCountNum),
+                maxNewHighPct: newHighNum,
             };
         } else {
             const target = Number(targetPrice || "0");
@@ -708,6 +767,7 @@ export function PriceStrategyManager() {
                                         <option value="entry_rebound">entry_rebound</option>
                                         <option value="failed_breakdown">failed_breakdown</option>
                                         <option value="pullback_to_ma">pullback_to_ma</option>
+                                        <option value="pulse_retrace_retest">pulse_retrace_retest</option>
                                     </select>
                                 </div>
                             </div>
@@ -739,6 +799,67 @@ export function PriceStrategyManager() {
                                     <div>
                                         <label htmlFor={`${fieldId}-threshold-pct`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Threshold (%)</label>
                                         <Input id={`${fieldId}-threshold-pct`} value={thresholdPct} onChange={(event) => setThresholdPct(event.target.value)} />
+                                    </div>
+                                </div>
+                            ) : strategyType === "pulse_retrace_retest" ? (
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label htmlFor={`${fieldId}-pulse-lookback-min`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Lookback (min)</label>
+                                            <Input id={`${fieldId}-pulse-lookback-min`} value={lookbackMin} onChange={(event) => setLookbackMin(event.target.value)} />
+                                        </div>
+                                        <div>
+                                            <label htmlFor={`${fieldId}-buy-cluster-window-min`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Buy Cluster (min)</label>
+                                            <Input id={`${fieldId}-buy-cluster-window-min`} value={buyClusterWindowMin} onChange={(event) => setBuyClusterWindowMin(event.target.value)} />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label htmlFor={`${fieldId}-pulse-window-min`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Pulse Window (min)</label>
+                                            <Input id={`${fieldId}-pulse-window-min`} value={pulseWindowMin} onChange={(event) => setPulseWindowMin(event.target.value)} />
+                                        </div>
+                                        <div>
+                                            <label htmlFor={`${fieldId}-min-pulse-pct`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Min Pulse (%)</label>
+                                            <Input id={`${fieldId}-min-pulse-pct`} value={minPulsePct} onChange={(event) => setMinPulsePct(event.target.value)} />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label htmlFor={`${fieldId}-min-bleed-min`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Min Bleed (min)</label>
+                                            <Input id={`${fieldId}-min-bleed-min`} value={minBleedMin} onChange={(event) => setMinBleedMin(event.target.value)} />
+                                        </div>
+                                        <div>
+                                            <label htmlFor={`${fieldId}-min-retrace-from-high-pct`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Min Retrace (%)</label>
+                                            <Input id={`${fieldId}-min-retrace-from-high-pct`} value={minRetraceFromHighPct} onChange={(event) => setMinRetraceFromHighPct(event.target.value)} />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label htmlFor={`${fieldId}-retest-tolerance-pct`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Retest Tolerance (%)</label>
+                                            <Input id={`${fieldId}-retest-tolerance-pct`} value={retestTolerancePct} onChange={(event) => setRetestTolerancePct(event.target.value)} />
+                                        </div>
+                                        <div>
+                                            <label htmlFor={`${fieldId}-undercut-pct`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Undercut (%)</label>
+                                            <Input id={`${fieldId}-undercut-pct`} value={undercutPct} onChange={(event) => setUndercutPct(event.target.value)} />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label htmlFor={`${fieldId}-min-buyer-count`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Min Buyers</label>
+                                            <Input id={`${fieldId}-min-buyer-count`} value={minBuyerCount} onChange={(event) => setMinBuyerCount(event.target.value)} />
+                                        </div>
+                                        <div>
+                                            <label htmlFor={`${fieldId}-max-new-high-pct`} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">New High Tolerance (%)</label>
+                                            <Input id={`${fieldId}-max-new-high-pct`} value={maxNewHighPct} onChange={(event) => setMaxNewHighPct(event.target.value)} />
+                                        </div>
+                                    </div>
+
+                                    <div className="rounded-[1.1rem] border border-dashed border-border/70 bg-background/24 px-3 py-2 text-[11px] text-muted-foreground">
+                                        Uses monitored buy clusters as launch anchors, then alerts when price returns to the launch zone after a pulse and bleed.
                                     </div>
                                 </div>
                             ) : (strategyType === "entry_long" || strategyType === "entry_rebound" || strategyType === "pullback_to_ma" || strategyType === "failed_breakdown") ? (

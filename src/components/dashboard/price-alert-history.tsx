@@ -62,6 +62,9 @@ function summarizeSnapshot(snapshot: Record<string, unknown>): string {
     if (kind === "failed_breakdown") {
         return `reclaim ${formatPercent(snapshot.reboundPct)} · dd ${formatPercent(-Number(snapshot.drawdownFromHighPct))}`;
     }
+    if (kind === "pulse_retrace_retest") {
+        return `pulse ${formatPercent(snapshot.pulsePct)} · retest ${formatPercent(snapshot.distanceFromAnchorPct)}`;
+    }
     return "-";
 }
 
@@ -124,7 +127,7 @@ export function PriceAlertHistory() {
                             const summary = summarizeSnapshot(row.snapshot || {});
                             const currentPrice = formatPrice(row.snapshot?.currentPrice);
                             const strategyType = row.strategy_type || "unknown";
-                            const isUp = strategyType.includes("up") || strategyType === "entry_long" || strategyType === "entry_rebound" || strategyType === "pullback_to_ma" || strategyType === "failed_breakdown";
+                            const isUp = strategyType.includes("up") || strategyType === "entry_long" || strategyType === "entry_rebound" || strategyType === "pullback_to_ma" || strategyType === "failed_breakdown" || strategyType === "pulse_retrace_retest";
 
                             return (
                                 <article key={row.id} className="rounded-[1.35rem] border border-border/70 bg-background/25 p-4">
@@ -188,7 +191,7 @@ export function PriceAlertHistory() {
                                 const summary = summarizeSnapshot(row.snapshot || {});
                                 const currentPrice = formatPrice(row.snapshot?.currentPrice);
                                 const strategyType = row.strategy_type || "unknown";
-                                const isUp = strategyType.includes("up") || strategyType === "entry_long" || strategyType === "entry_rebound" || strategyType === "pullback_to_ma" || strategyType === "failed_breakdown";
+                                const isUp = strategyType.includes("up") || strategyType === "entry_long" || strategyType === "entry_rebound" || strategyType === "pullback_to_ma" || strategyType === "failed_breakdown" || strategyType === "pulse_retrace_retest";
 
                                 return (
                                     <TableRow key={row.id} className="border-border hover:bg-muted/40 transition-colors">

@@ -13,7 +13,7 @@
 
 ## 1. 当前支持的信号类型
 
-目前系统支持 8 类价格信号：
+目前系统支持 9 类价格信号：
 
 - `pct_change_up`
 - `pct_change_down`
@@ -23,6 +23,7 @@
 - `entry_rebound`
 - `failed_breakdown`
 - `pullback_to_ma`
+- `pulse_retrace_retest`
 
 其中：
 
@@ -32,6 +33,7 @@
 - `entry_rebound` 属于“局部低点反弹 / 结构修复触发”
 - `failed_breakdown` 属于“深度回撤后的假跌破收复触发（实验）”
 - `pullback_to_ma` 属于“趋势中的回踩均线再启动触发”
+- `pulse_retrace_retest` 属于“监控买入后的脉冲拉升回踩起涨区触发”
 
 ---
 
@@ -660,6 +662,120 @@
 
 ---
 
+## 4.8 `pulse_retrace_retest`
+
+### 目标定位
+
+`pulse_retrace_retest` 用来识别监控人买入后出现快速脉冲上涨，随后价格缓慢回落到前一次起涨区附近的结构。它把监控买入日志当作起涨锚点，把价格快照当作 PA 序列，在回踩到锚点价格带时发出提醒。
+
+### 参数
+
+- `lookbackMin`：回看窗口，默认 `4320` 分钟
+- `buyClusterWindowMin`：把相邻监控买入合并成同一组的时间窗口，默认 `30` 分钟
+- `pulseWindowMin`：监控买入后寻找脉冲高点的时间窗口，默认 `120` 分钟
+- `minPulsePct`：从起涨锚点到脉冲高点的最小涨幅，默认 `60`
+- `minBleedMin`：从脉冲高点到当前时间的最小回落时长，默认 `180` 分钟
+- `minRetraceFromHighPct`：当前价相对脉冲高点的最小回撤，默认 `35`
+- `retestTolerancePct`：当前价高于起涨锚点的最大容忍范围，默认 `8`
+- `undercutPct`：当前价低于起涨锚点的最大容忍范围，默认 `12`
+- `minBuyerCount`：同一组监控买入中的最少监控人数，默认 `1`
+- `maxNewHighPct`：脉冲高点之后允许的新高容忍范围，默认 `10`
+- `anchorPriceMaxGapMin`：买入时间附近可接受的价格快照间隔，默认 `120`
+
+### 数据样本要求
+
+- `logs.token_info.mint` 与 watch token mint 匹配
+- 买入事件来自 `token_info.action = BUY` 或日志类型包含 `BUY`
+- 监控人使用 `token_info.personName` 聚合
+- 价格历史至少有 `4` 个有效样本
+- 起涨锚点附近存在有效价格快照
+
+### 计算字段
+
+对每组监控买入：
+
+- `anchorPrice` = 买入组开始或结束时间附近的价格
+- `pulseHighPrice` = 买入组后 `pulseWindowMin` 内最高价
+- `pulsePct = (pulseHighPrice - anchorPrice) / anchorPrice * 100`
+- `bleedDurationMin = now - pulseHighTime`
+- `retraceFromHighPct = (pulseHighPrice - currentPrice) / pulseHighPrice * 100`
+- `distanceFromAnchorPct = (currentPrice - anchorPrice) / anchorPrice * 100`
+- `lowerRetestPrice = anchorPrice * (1 - undercutPct / 100)`
+- `upperRetestPrice = anchorPrice * (1 + retestTolerancePct / 100)`
+
+### 触发条件
+
+必须同时满足以下条件：
+
+1. **监控买入成组**
+
+   - 同一组买入的监控人数 `>= minBuyerCount`
+   - 同组买入间隔由 `buyClusterWindowMin` 控制
+
+2. **形成脉冲上涨**
+
+   `pulsePct >= minPulsePct`
+
+3. **经历足够长的回落**
+
+   - `bleedDurationMin >= minBleedMin`
+   - `retraceFromHighPct >= minRetraceFromHighPct`
+
+4. **回到起涨价格带**
+
+   - `currentPrice >= lowerRetestPrice`
+   - `currentPrice <= upperRetestPrice`
+
+5. **脉冲高点保持有效**
+
+   脉冲高点之后的新高幅度在 `maxNewHighPct` 容忍范围内。
+
+### Telegram 文案字段含义
+
+触发后消息里常见字段：
+
+- `Launch Zone` = `anchorPrice`
+- `Pulse High` = `pulseHighPrice`
+- `Pulse` = `pulsePct`
+- `Retrace` = `-retraceFromHighPct`
+- `To Launch` = `distanceFromAnchorPct`
+- `Bleed` = `bleedDurationMin`
+- `Buyers` = 监控人数和监控人名单
+
+### 特点
+
+- 这是一个监控买入驱动的 PA 结构信号
+- 默认适合观察 1-3 天内的二次脉冲机会
+- `minBuyerCount` 可以提高多人共振要求
+- `retestTolerancePct` 和 `undercutPct` 控制起涨区宽度
+- `cooldownSec` 建议使用 `21600` 秒，降低同一结构重复提醒频率
+
+### 自动创建
+
+Helius webhook 写入 BUY 日志成功后，会检查该 token 最近 `4320` 分钟内的唯一监控买入人数。
+
+当人数 `>= 2` 时，系统会自动：
+
+1. 确保该 token 已进入 `watch_tokens`
+2. 创建 `Auto Pulse Retest` 策略
+3. 给策略写入 `autoCreated: true`
+
+已有任意活跃的 `pulse_retrace_retest` 策略时，系统复用现有策略。已有自动创建且停用的策略时，系统重新启用它。
+
+可用环境变量：
+
+- `AUTO_PULSE_RETEST_MIN_BUYERS`：自动创建阈值，默认 `2`
+- `AUTO_PULSE_RETEST_LOOKBACK_MIN`：统计买入人数的回看窗口，默认 `4320`
+
+### 适合优化的方向
+
+- 按 token 波动率动态调整起涨区宽度
+- 加入成交量或流动性过滤
+- 记录命中后的二次脉冲结果，用于调优 `minPulsePct` 与 `minBleedMin`
+- 增加回踩过程的斜率过滤，区分快速砸回和慢速阴跌
+
+---
+
 ## 5. 参数录入口径
 
 ### 5.1 Telegram `/strategyadd`
@@ -673,7 +789,9 @@
 /strategyadd <mint> breakout_down <targetPrice> [cooldownSec]
 /strategyadd <mint> entry_long <lookbackMin> <fastWindowMin> <slowWindowMin> <targetPct> [cooldownSec] [breakoutTolerancePct] [minTrendPct]
 /strategyadd <mint> entry_rebound <lookbackMin> <fastWindowMin> <slowWindowMin> <targetPct> [cooldownSec] [minReboundPct] [maxDistanceFromLowPct]
+/strategyadd <mint> failed_breakdown <lookbackMin> <fastWindowMin> <slowWindowMin> <targetPct> [cooldownSec] [reclaimPct] [maxDistanceFromLowPct] [minDrawdownPct]
 /strategyadd <mint> pullback_to_ma <lookbackMin> <fastWindowMin> <slowWindowMin> <targetPct> [cooldownSec] [pullbackTolerancePct] [minTrendPct]
+/strategyadd <mint> pulse_retrace_retest <lookbackMin> <buyClusterWindowMin> <pulseWindowMin> <minPulsePct> <minBleedMin> <minRetraceFromHighPct> <retestTolerancePct> <undercutPct> [cooldownSec] [minBuyerCount] [maxNewHighPct]
 ```
 
 ### 5.2 Dashboard
@@ -684,7 +802,9 @@ Dashboard 的策略管理面板与 TG Bot 的参数口径基本一致：
 - `breakout_*`：`targetPrice`
 - `entry_long`：`lookbackMin`、`fastWindowMin`、`slowWindowMin`、`targetPct`、`breakoutTolerancePct`、`minTrendPct`
 - `entry_rebound`：`lookbackMin`、`fastWindowMin`、`slowWindowMin`、`targetPct`、`minReboundPct`、`maxDistanceFromLowPct`
+- `failed_breakdown`：`lookbackMin`、`fastWindowMin`、`slowWindowMin`、`targetPct`、`reclaimPct`、`maxDistanceFromLowPct`、`minDrawdownPct`
 - `pullback_to_ma`：`lookbackMin`、`fastWindowMin`、`slowWindowMin`、`targetPct`、`pullbackTolerancePct`、`minTrendPct`
+- `pulse_retrace_retest`：`lookbackMin`、`buyClusterWindowMin`、`pulseWindowMin`、`minPulsePct`、`minBleedMin`、`minRetraceFromHighPct`、`retestTolerancePct`、`undercutPct`、`minBuyerCount`、`maxNewHighPct`
 
 ---
 
@@ -697,6 +817,9 @@ Dashboard 的策略管理面板与 TG Bot 的参数口径基本一致：
 - `entry_long` 的 `targetPct` 不参与实时触发，只参与提醒与回测目标
 - `entry_rebound` 的 `targetPct` 也不参与实时触发，只参与提醒与回测目标
 - `pullback_to_ma` 的 `targetPct` 同样不参与实时触发，只参与提醒与回测目标
+- `pulse_retrace_retest` 需要监控买入日志和价格快照同时存在
+- BUY 日志写入后会按最近 `4320` 分钟内唯一监控人数自动创建 `pulse_retrace_retest`
+- 价格快照默认保留 `360` 小时，覆盖 `pulse_retrace_retest` 默认回看窗口
 - `cooldown` 和 `dedupe` 会影响“是否发出提醒”，但不改变“理论上是否命中信号”
 - 触发规则和回测规则不是同一层：
   - 触发规则在 `strategy-engine.ts`

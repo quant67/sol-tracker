@@ -104,6 +104,7 @@ function strategyUsageText(): string {
         '/strategyadd <mint> entry_rebound <lookbackMin> <fastWindowMin> <slowWindowMin> <targetPct> [cooldownSec] [minReboundPct] [maxDistanceFromLowPct]',
         '/strategyadd <mint> failed_breakdown <lookbackMin> <fastWindowMin> <slowWindowMin> <targetPct> [cooldownSec] [reclaimPct] [maxDistanceFromLowPct] [minDrawdownPct]',
         '/strategyadd <mint> pullback_to_ma <lookbackMin> <fastWindowMin> <slowWindowMin> <targetPct> [cooldownSec] [pullbackTolerancePct] [minTrendPct]',
+        '/strategyadd <mint> pulse_retrace_retest <lookbackMin> <buyClusterWindowMin> <pulseWindowMin> <minPulsePct> <minBleedMin> <minRetraceFromHighPct> <retestTolerancePct> <undercutPct> [cooldownSec] [minBuyerCount] [maxNewHighPct]',
         '',
         'Examples:',
         '/strategyadd 7vfCXT... pct_change_up 5 10 300',
@@ -112,6 +113,7 @@ function strategyUsageText(): string {
         '/strategyadd 7vfCXT... entry_rebound 30 5 15 8 300 1.5 6',
         '/strategyadd 7vfCXT... failed_breakdown 45 5 20 8 300 1 4 12',
         '/strategyadd 7vfCXT... pullback_to_ma 45 5 20 8 300 1.5 3',
+        '/strategyadd 7vfCXT... pulse_retrace_retest 4320 30 120 60 180 35 8 12 21600 1 10',
     ].join('\n');
 }
 
@@ -222,6 +224,37 @@ function buildStrategyPayload(
                 minDrawdownPct: minDrawdownPct ?? 12,
             },
             cooldownSec: cooldownSec ? Math.floor(cooldownSec) : 300,
+        };
+    }
+
+    if (strategyType === 'pulse_retrace_retest') {
+        if (parts.length < 11) return null;
+        const lookbackMin = parsePositiveNumber(parts[3]);
+        const buyClusterWindowMin = parsePositiveNumber(parts[4]);
+        const pulseWindowMin = parsePositiveNumber(parts[5]);
+        const minPulsePct = parsePositiveNumber(parts[6]);
+        const minBleedMin = parsePositiveNumber(parts[7]);
+        const minRetraceFromHighPct = parsePositiveNumber(parts[8]);
+        const retestTolerancePct = parsePositiveNumber(parts[9]);
+        const undercutPct = parsePositiveNumber(parts[10]);
+        if (!lookbackMin || !buyClusterWindowMin || !pulseWindowMin || !minPulsePct || !minBleedMin || !minRetraceFromHighPct || !retestTolerancePct || !undercutPct) return null;
+        const cooldownSec = parts[11] ? parsePositiveNumber(parts[11]) : 21600;
+        const minBuyerCount = parts[12] ? parsePositiveNumber(parts[12]) : 1;
+        const maxNewHighPct = parts[13] ? parsePositiveNumber(parts[13]) : 10;
+        return {
+            params: {
+                lookbackMin,
+                buyClusterWindowMin,
+                pulseWindowMin,
+                minPulsePct,
+                minBleedMin,
+                minRetraceFromHighPct,
+                retestTolerancePct,
+                undercutPct,
+                minBuyerCount: minBuyerCount ? Math.floor(minBuyerCount) : 1,
+                maxNewHighPct: maxNewHighPct ?? 10,
+            },
+            cooldownSec: cooldownSec ? Math.floor(cooldownSec) : 21600,
         };
     }
 

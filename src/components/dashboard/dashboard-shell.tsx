@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Target, LogOut, Shield, Activity, PanelLeft, X } from "lucide-react";
+import { Target, LogOut, Shield, Activity, PanelLeft, Trophy, X } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { AddressSidebar } from "@/components/dashboard/address-sidebar";
 import { Button } from "@/components/ui/button";
@@ -111,9 +111,20 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                             size="sm"
                             className="border-border/70 bg-card/60 text-muted-foreground hover:text-foreground"
                         >
+                            <a href="#token-leaderboard">
+                                <Trophy className="w-4 h-4 text-primary" />
+                                <span className="hidden sm:inline">Leaderboard</span>
+                            </a>
+                        </Button>
+                        <Button
+                            asChild
+                            variant="outline"
+                            size="sm"
+                            className="border-border/70 bg-card/60 text-muted-foreground hover:text-foreground"
+                        >
                             <a href="#recent-signals">
                                 <Activity className="w-4 h-4 text-primary" />
-                                Live feed
+                                <span className="hidden sm:inline">Live feed</span>
                             </a>
                         </Button>
                         <Button

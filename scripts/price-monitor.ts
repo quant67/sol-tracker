@@ -7,6 +7,7 @@ import {
     evaluateStrategy,
     getMaxWindowMinutes,
     normalizeStrategy,
+    type MonitoredBuyEvent,
     type PricePoint,
     type StrategyDefinition,
 } from '../src/lib/strategy-engine';
@@ -28,7 +29,7 @@ const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SU
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const INTERVAL_SEC = Number(process.env.PRICE_MONITOR_INTERVAL_SEC || 20);
-const RETENTION_HOURS = Number(process.env.PRICE_SNAPSHOT_RETENTION_HOURS || 48);
+const RETENTION_HOURS = Number(process.env.PRICE_SNAPSHOT_RETENTION_HOURS || 360);
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
     console.error('Missing Supabase credentials for price monitor.');
@@ -53,9 +54,29 @@ interface PriceFetchResult {
     source: string;
 }
 
+interface LogTokenInfo {
+    action?: string;
+    mint?: string;
+    marketCap?: number | string | null;
+    personName?: string;
+}
+
 function toNumber(value: unknown): number | null {
     const n = typeof value === 'number' ? value : Number(value);
     return Number.isFinite(n) ? n : null;
+}
+
+function readTokenInfo(value: unknown): LogTokenInfo {
+    if (!value) return {};
+    if (typeof value === 'string') {
+        try {
+            const parsed = JSON.parse(value);
+            return typeof parsed === 'object' && parsed ? parsed : {};
+        } catch {
+            return {};
+        }
+    }
+    return typeof value === 'object' ? value as LogTokenInfo : {};
 }
 
 function sleep(ms: number): Promise<void> {
@@ -242,6 +263,25 @@ function buildPriceAlertMessage(
         }
     }
 
+    if (snapshot?.kind === 'pulse_retrace_retest') {
+        const anchorPrice = toNumber(snapshot.anchorPrice);
+        const pulseHighPrice = toNumber(snapshot.pulseHighPrice);
+        const pulsePct = toNumber(snapshot.pulsePct);
+        const retraceFromHighPct = toNumber(snapshot.retraceFromHighPct);
+        const distanceFromAnchorPct = toNumber(snapshot.distanceFromAnchorPct);
+        const bleedDurationMin = toNumber(snapshot.bleedDurationMin);
+        const buyerCount = toNumber(snapshot.buyerCount);
+        const buyers = Array.isArray(snapshot.buyers) ? snapshot.buyers.map(String).join(', ') : '';
+
+        if (anchorPrice !== null) lines.push(`<b>Launch Zone:</b> $${formatPrice(anchorPrice)}`);
+        if (pulseHighPrice !== null) lines.push(`<b>Pulse High:</b> $${formatPrice(pulseHighPrice)}`);
+        if (pulsePct !== null) lines.push(`<b>Pulse:</b> ${formatPct(pulsePct)}`);
+        if (retraceFromHighPct !== null) lines.push(`<b>Retrace:</b> ${formatPct(-retraceFromHighPct)}`);
+        if (distanceFromAnchorPct !== null) lines.push(`<b>To Launch:</b> ${formatPct(distanceFromAnchorPct)}`);
+        if (bleedDurationMin !== null) lines.push(`<b>Bleed:</b> ${Math.round(bleedDurationMin)}m`);
+        if (buyerCount !== null) lines.push(`<b>Buyers:</b> ${buyerCount}${buyers ? ` · ${buyers}` : ''}`);
+    }
+
     const dexLink = `<a href="https://dexscreener.com/solana/${token.mint}">DexScreener</a>`;
     const birdeyeLink = `<a href="https://birdeye.so/token/${token.mint}">Birdeye</a>`;
     lines.push(`🔗 ${dexLink} | ${birdeyeLink}`);
@@ -280,6 +320,39 @@ async function cleanupSnapshots(): Promise<void> {
     }
 }
 
+async function fetchMonitoredBuys(mint: string, sinceIso: string): Promise<MonitoredBuyEvent[]> {
+    const { data, error } = await supabase
+        .from('logs')
+        .select('type, token_info, timestamp')
+        .eq('token_info->>mint', mint)
+        .gte('timestamp', sinceIso)
+        .order('timestamp', { ascending: true })
+        .limit(1000);
+
+    if (error) {
+        logToFile(`Fetch buy logs failed for ${mint.slice(0, 8)}: ${error.message}`, 'ERROR');
+        return [];
+    }
+
+    return (data || [])
+        .map((row: any) => {
+            const tokenInfo = readTokenInfo(row.token_info);
+            const action = String(tokenInfo.action || '').toUpperCase();
+            const type = String(row.type || '').toUpperCase();
+            if (action !== 'BUY' && !type.includes('BUY')) return null;
+
+            const timestampMs = new Date(row.timestamp).getTime();
+            if (!Number.isFinite(timestampMs)) return null;
+
+            return {
+                timestampMs,
+                buyerName: tokenInfo.personName || 'Unknown',
+                marketCap: toNumber(tokenInfo.marketCap),
+            };
+        })
+        .filter((event: MonitoredBuyEvent | null): event is MonitoredBuyEvent => !!event);
+}
+
 async function processToken(token: WatchTokenRow, strategies: StrategyDefinition[]): Promise<void> {
     const priceData = await fetchPriceFromDexScreener(token.mint);
     if (!priceData) {
@@ -290,6 +363,10 @@ async function processToken(token: WatchTokenRow, strategies: StrategyDefinition
     const nowMs = Date.now();
     const maxWindow = Math.max(getMaxWindowMinutes(strategies), 1);
     const historySinceIso = new Date(nowMs - maxWindow * 60 * 1000).toISOString();
+    const snapshotLimit = Math.min(
+        Math.max(1500, Math.ceil((maxWindow * 60) / Math.max(INTERVAL_SEC, 5)) + 60),
+        30000
+    );
 
     const { data: snapshotRows, error: snapshotError } = await supabase
         .from('price_snapshots')
@@ -297,7 +374,7 @@ async function processToken(token: WatchTokenRow, strategies: StrategyDefinition
         .eq('watch_token_id', token.id)
         .gte('captured_at', historySinceIso)
         .order('captured_at', { ascending: true })
-        .limit(1500);
+        .limit(snapshotLimit);
 
     if (snapshotError) {
         logToFile(`Fetch snapshots failed for ${token.mint.slice(0, 8)}: ${snapshotError.message}`, 'ERROR');
@@ -313,6 +390,8 @@ async function processToken(token: WatchTokenRow, strategies: StrategyDefinition
     history.push({ price: priceData.price, capturedAtMs: nowMs });
 
     const previousPrice = toNumber(token.last_price) ?? (history.length >= 2 ? history[history.length - 2].price : null);
+    const needsBuyContext = strategies.some((strategy) => strategy.type === 'pulse_retrace_retest');
+    const monitoredBuys = needsBuyContext ? await fetchMonitoredBuys(token.mint, historySinceIso) : [];
 
     const { error: insertSnapError } = await supabase
         .from('price_snapshots')
@@ -342,7 +421,14 @@ async function processToken(token: WatchTokenRow, strategies: StrategyDefinition
     }
 
     for (const strategy of strategies) {
-        const evalResult = evaluateStrategy(strategy, priceData.price, previousPrice, history, nowMs);
+        const evalResult = evaluateStrategy(
+            strategy,
+            priceData.price,
+            previousPrice,
+            history,
+            nowMs,
+            { monitoredBuys }
+        );
         if (!evalResult.triggered) {
             continue;
         }
