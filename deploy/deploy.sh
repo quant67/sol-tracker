@@ -6,12 +6,25 @@
 # ============================================
 set -e
 
-# 确保非交互式 SSH 登录时能找到 node/npm
-# (GitHub Actions SSH 不加载 .bashrc/.bash_profile)
-export PATH="/usr/local/bin:/usr/bin:$HOME/.nvm/versions/node/$(ls $HOME/.nvm/versions/node/ 2>/dev/null | tail -1)/bin:$PATH"
+# 确保非交互式 SSH 登录时能找到 node/npm/pm2
+# GitHub Actions SSH 不加载交互式 shell 环境，部分 profile 也会重置 PATH。
 [ -f "$HOME/.bashrc" ] && source "$HOME/.bashrc" 2>/dev/null || true
 [ -f "$HOME/.bash_profile" ] && source "$HOME/.bash_profile" 2>/dev/null || true
 [ -f "$HOME/.profile" ] && source "$HOME/.profile" 2>/dev/null || true
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
+hash -r
+
+if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+    echo "❌ node/npm 不在 PATH 中，请检查 NVM 安装。"
+    exit 1
+fi
+
+if ! command -v pm2 >/dev/null 2>&1; then
+    echo "  PM2 未找到，正在安装..."
+    npm install -g pm2
+    hash -r
+fi
 
 APP_DIR="/opt/sol-tracker"
 cd "$APP_DIR"
