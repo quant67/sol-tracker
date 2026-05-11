@@ -10,6 +10,10 @@ const WINDOW_DAYS = {
 } as const;
 
 const SORT_MODES = ['buyers_desc', 'recent_desc', 'market_cap_desc'] as const;
+const DEFAULT_LIMIT = 50;
+const MAX_LIMIT = 100;
+const DEFAULT_MIN_BUYERS = 2;
+const CACHE_TTL_MS = 60_000;
 
 type WindowKey = keyof typeof WINDOW_DAYS;
 type SortMode = typeof SORT_MODES[number];
@@ -100,12 +104,40 @@ interface ResolvedTokenInfo {
     marketCap: number | null;
 }
 
+interface TokenLeaderboardResponse {
+    window: WindowKey;
+    sort: SortMode;
+    limit: number;
+    minBuyers: number;
+    generatedAt: string;
+    cached: boolean;
+    totalTokens: number;
+    filteredTokens: number;
+    items: TokenLeaderboardItem[];
+}
+
+const responseCache = new Map<string, { expiresAt: number; payload: TokenLeaderboardResponse }>();
+
+function pruneResponseCache(now: number) {
+    if (responseCache.size <= 200) return;
+    for (const [key, value] of responseCache.entries()) {
+        if (value.expiresAt <= now) responseCache.delete(key);
+    }
+}
+
 function isWindowKey(value: string): value is WindowKey {
     return value in WINDOW_DAYS;
 }
 
 function isSortMode(value: string): value is SortMode {
     return SORT_MODES.includes(value as SortMode);
+}
+
+function getBoundedInteger(value: string | null, fallback: number, min: number, max: number) {
+    if (!value?.trim()) return fallback;
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return fallback;
+    return Math.min(Math.max(Math.floor(parsed), min), max);
 }
 
 function parseTokenInfo(value: unknown): TokenInfoJson {
@@ -329,6 +361,8 @@ export async function GET(req: NextRequest) {
         const { searchParams } = new URL(req.url);
         const windowParam = searchParams.get('window') || '1d';
         const sortParam = searchParams.get('sort') || 'buyers_desc';
+        const limit = getBoundedInteger(searchParams.get('limit'), DEFAULT_LIMIT, 1, MAX_LIMIT);
+        const minBuyers = getBoundedInteger(searchParams.get('minBuyers'), DEFAULT_MIN_BUYERS, 1, 1000);
 
         if (!isWindowKey(windowParam)) {
             return NextResponse.json(
@@ -342,6 +376,14 @@ export async function GET(req: NextRequest) {
                 { error: 'Unsupported sort mode.' },
                 { status: 400 }
             );
+        }
+
+        const now = Date.now();
+        pruneResponseCache(now);
+        const cacheKey = `${windowParam}:${sortParam}:${limit}:${minBuyers}`;
+        const cached = responseCache.get(cacheKey);
+        if (cached && cached.expiresAt > now) {
+            return NextResponse.json({ ...cached.payload, cached: true });
         }
 
         const since = new Date(Date.now() - WINDOW_DAYS[windowParam] * 24 * 60 * 60 * 1000);
@@ -464,9 +506,13 @@ export async function GET(req: NextRequest) {
             }
         }
 
-        const currentInfoMap = await fetchCurrentTokenInfo(items.map((item) => item.mint));
+        const totalTokens = items.length;
+        const filteredItems = items.filter((item) => item.buyerCount >= minBuyers);
+        const topItems = sortItems(filteredItems, sortParam).slice(0, limit);
 
-        const fallbackItems = items.filter((item) =>
+        const currentInfoMap = await fetchCurrentTokenInfo(topItems.map((item) => item.mint));
+
+        const fallbackItems = topItems.filter((item) =>
             !currentInfoMap.has(item.mint)
             && (hasWeakTokenIdentity(item.mint, item.symbol, item.name) || item.marketCap === null || item.lastBuyMarketCap !== null)
         );
@@ -484,19 +530,31 @@ export async function GET(req: NextRequest) {
             }
         );
 
-        for (const item of items) {
+        for (const item of topItems) {
             const info = currentInfoMap.get(item.mint);
             if (info) {
                 applyResolvedInfo(item, info);
             }
         }
 
-        return NextResponse.json({
+        const payload: TokenLeaderboardResponse = {
             window: windowParam,
             sort: sortParam,
+            limit,
+            minBuyers,
             generatedAt: new Date().toISOString(),
-            items: sortItems(items, sortParam),
+            cached: false,
+            totalTokens,
+            filteredTokens: filteredItems.length,
+            items: topItems,
+        };
+
+        responseCache.set(cacheKey, {
+            expiresAt: now + CACHE_TTL_MS,
+            payload,
         });
+
+        return NextResponse.json(payload);
     } catch (error: unknown) {
         return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });
     }

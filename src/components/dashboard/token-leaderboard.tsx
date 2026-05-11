@@ -21,6 +21,8 @@ import {
 import { usePolling } from "@/hooks/use-polling";
 
 const POLL_INTERVAL = 15000;
+const LEADERBOARD_LIMIT = 50;
+const MIN_BUYERS = 2;
 const WINDOW_OPTIONS = [
     { value: "1d", label: "1D" },
     { value: "3d", label: "3D" },
@@ -137,7 +139,12 @@ export function TokenLeaderboard() {
     const [copiedMint, setCopiedMint] = useState("");
 
     const queryString = useMemo(
-        () => new URLSearchParams({ window: windowKey, sort: sortMode }).toString(),
+        () => new URLSearchParams({
+            window: windowKey,
+            sort: sortMode,
+            limit: String(LEADERBOARD_LIMIT),
+            minBuyers: String(MIN_BUYERS),
+        }).toString(),
         [windowKey, sortMode]
     );
 
@@ -234,7 +241,7 @@ export function TokenLeaderboard() {
                     </div>
                 ) : items.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-border/70 p-10 text-center text-sm text-muted-foreground transition-colors">
-                        Waiting for buy signals in this window
+                        Waiting for 2+ buyer signals in this window
                     </div>
                 ) : (
                     <>

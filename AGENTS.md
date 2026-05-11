@@ -59,6 +59,8 @@ BUY 日志写入后，如果同一个 token 最近 4320 分钟内唯一监控买
 - 缺失的代币信息复用 `resolveTokenInfo(mint)`。
 - 默认排序是监控人数降序，最近买入时间作为次级排序。
 - 变化列使用当前市值相对最近一次买入日志市值的百分比。
+- 榜单默认只返回 Top 50，且默认过滤到至少 2 个监控人买入的 token。
+- 榜单 API 对 `window + sort + limit + minBuyers` 做 60 秒服务端缓存。
 - `pulse_retrace_retest` 默认回看 4320 分钟，默认 cooldown 为 21600 秒。
 - `pulse_retrace_retest` 依赖 `logs.token_info.personName` 和 `price_snapshots`。
 - 自动创建由 `AUTO_PULSE_RETEST_ENABLED` 控制，默认关闭。

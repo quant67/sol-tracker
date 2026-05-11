@@ -16,7 +16,14 @@
 
 ### API
 
-新增 `GET /api/token-leaderboard?window=1d|3d|7d|15d&sort=buyers_desc`。
+新增 `GET /api/token-leaderboard?window=1d|3d|7d|15d&sort=buyers_desc&limit=50&minBuyers=2`。
+
+性能收敛：
+
+- 默认只返回 Top 50，`limit` 最大值为 `100`。
+- 默认只返回 `buyerCount >= 2` 的 token，降低单人买入 token 对榜单的膨胀影响。
+- API 先完成聚合、过滤、排序和截断，再对截断后的 token 查询当前市值。
+- 以 `window + sort + limit + minBuyers` 作为 key 做 60 秒服务端内存缓存。
 
 返回结构：
 
@@ -32,6 +39,18 @@ type TokenLeaderboardItem = {
   buyers: string[];
   lastBoughtAt: string;
 };
+
+type TokenLeaderboardResponse = {
+  window: "1d" | "3d" | "7d" | "15d";
+  sort: "buyers_desc" | "recent_desc" | "market_cap_desc";
+  limit: number;
+  minBuyers: number;
+  generatedAt: string;
+  cached: boolean;
+  totalTokens: number;
+  filteredTokens: number;
+  items: TokenLeaderboardItem[];
+};
 ```
 
 聚合流程：
@@ -41,9 +60,11 @@ type TokenLeaderboardItem = {
 3. 收集日志地址，查询对应 `addresses` 和 `people`。
 4. 以 `token_info.mint` 作为 CA 聚合。
 5. 每个 CA 内用 `person_id` 去重；缺少 `person_id` 时使用 `token_info.personName` 兜底。
-6. 代币名称和当前市值优先通过 DexScreener 批量查询，缺失时调用 `resolveTokenInfo(mint)`。
-7. `priceChangePct` 使用当前市值相对最近一次买入日志市值计算。
-8. 默认按 `buyerCount` 降序，次级按 `lastBoughtAt` 降序。
+6. 按 `minBuyers` 过滤，默认保留 2 个及以上监控人买入的 token。
+7. 按当前排序规则截取 Top N，默认 `50`。
+8. 代币名称和当前市值优先通过 DexScreener 批量查询，缺失时调用 `resolveTokenInfo(mint)`。
+9. `priceChangePct` 使用当前市值相对最近一次买入日志市值计算。
+10. 默认按 `buyerCount` 降序，次级按 `lastBoughtAt` 降序。
 
 ### UI
 
@@ -78,5 +99,37 @@ type TokenLeaderboardItem = {
 
 - 增加买入金额、最近买入时间、首次买入时间。
 - 增加按市值、最近买入时间排序。
-- 增加 SQL view 或 materialized view 以支撑更大数据量。
 - 增加 Telegram 每日榜单推送。
+
+## 7. 长期方案存档：榜单 Rollup 表
+
+当 `logs` 继续增长后，将榜单从请求时聚合改为增量维护聚合表。
+
+候选表：
+
+```sql
+token_leaderboard_rollups (
+  window_key text,
+  mint text,
+  buyer_count integer,
+  buyers jsonb,
+  first_bought_at timestamptz,
+  last_bought_at timestamptz,
+  last_buy_market_cap numeric,
+  latest_symbol text,
+  latest_name text,
+  latest_market_cap numeric,
+  updated_at timestamptz,
+  primary key (window_key, mint)
+)
+```
+
+维护方式：
+
+1. webhook 写入 BUY 日志后，把该 token 的 `1d / 3d / 7d / 15d` rollup 标记为 dirty。
+2. cron 或 worker 按 dirty token 重算对应窗口，写入 `token_leaderboard_rollups`。
+3. Dashboard API 只读取 rollup 表，继续应用 `limit`、`minBuyers` 和排序。
+4. 当前市值 enrichment 独立缓存，可按 token 做 5-10 分钟 TTL。
+5. 定期清理超出窗口且 `buyer_count = 0` 的 rollup 行。
+
+这个方案把读取压力从“每次请求扫描日志”转为“日志写入后增量维护 + 请求读取聚合结果”。
