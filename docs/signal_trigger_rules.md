@@ -752,6 +752,8 @@
 
 ### 自动创建
 
+自动创建由 `AUTO_PULSE_RETEST_ENABLED` 控制，默认 `false`。设置为 `true` 后启用 BUY 后自动创建流程。
+
 Helius webhook 写入 BUY 日志成功后，会检查该 token 最近 `4320` 分钟内的唯一监控买入人数。
 
 当人数 `>= 2` 时，系统会自动：
@@ -764,6 +766,7 @@ Helius webhook 写入 BUY 日志成功后，会检查该 token 最近 `4320` 分
 
 可用环境变量：
 
+- `AUTO_PULSE_RETEST_ENABLED`：自动创建开关，默认 `false`
 - `AUTO_PULSE_RETEST_MIN_BUYERS`：自动创建阈值，默认 `2`
 - `AUTO_PULSE_RETEST_LOOKBACK_MIN`：统计买入人数的回看窗口，默认 `4320`
 

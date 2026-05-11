@@ -61,6 +61,7 @@ BUY 日志写入后，如果同一个 token 最近 4320 分钟内唯一监控买
 - 变化列使用当前市值相对最近一次买入日志市值的百分比。
 - `pulse_retrace_retest` 默认回看 4320 分钟，默认 cooldown 为 21600 秒。
 - `pulse_retrace_retest` 依赖 `logs.token_info.personName` 和 `price_snapshots`。
+- 自动创建由 `AUTO_PULSE_RETEST_ENABLED` 控制，默认关闭。
 - 自动创建阈值默认是最近 4320 分钟内 2 个唯一监控人买入。
 - 自动创建策略会写入 `autoCreated: true`，已有活跃同类策略时直接复用。
 

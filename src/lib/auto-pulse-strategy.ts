@@ -66,6 +66,17 @@ function getEnvNumber(key: string, fallback: number): number {
     return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
+function getEnvBoolean(key: string, fallback: boolean): boolean {
+    const value = process.env[key]?.trim().toLowerCase();
+    if (value === 'true' || value === '1' || value === 'yes' || value === 'on') return true;
+    if (value === 'false' || value === '0' || value === 'no' || value === 'off') return false;
+    return fallback;
+}
+
+export function isAutoPulseRetestEnabled(): boolean {
+    return getEnvBoolean('AUTO_PULSE_RETEST_ENABLED', false);
+}
+
 function parseTokenInfo(value: unknown): LogTokenInfo {
     if (!value) return {};
     if (typeof value === 'string') {
@@ -267,6 +278,10 @@ export async function ensureAutoPulseRetestStrategy(input: AutoPulseStrategyInpu
     const mint = input.mint.trim();
     const minBuyers = Math.floor(getEnvNumber('AUTO_PULSE_RETEST_MIN_BUYERS', 2));
     const lookbackMin = Math.floor(getEnvNumber('AUTO_PULSE_RETEST_LOOKBACK_MIN', DEFAULT_LOOKBACK_MIN));
+
+    if (!isAutoPulseRetestEnabled()) {
+        return { created: false, reactivated: false, buyerCount: 0, strategyId: null, reason: 'disabled' };
+    }
 
     if (!mint) {
         return { created: false, reactivated: false, buyerCount: 0, strategyId: null, reason: 'missing_mint' };
